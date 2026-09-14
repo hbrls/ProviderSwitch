@@ -36,7 +36,7 @@ serde = { version = "1.0", features = ["derive"] }
 log = "0.4"
 chrono = { version = "0.4", features = ["serde"] }
 # Keep shared Rust/JS dependencies on matching minor releases in package.json.
-tauri = { version = "~2.10.3", features = ["macos-private-api", "tray-icon", "protocol-asset", "image-png"] }
+tauri = { version = "~2.10.3", features = ["devtools", "macos-private-api", "tray-icon", "protocol-asset", "image-png"] }
 tauri-plugin-log = "~2.8.0"
 tauri-plugin-opener = "2"
 tauri-plugin-process = "~2.3.1"
