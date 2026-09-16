@@ -23,6 +23,8 @@ pub mod http_client;
 pub mod hyper_client;
 pub(crate) mod json_canonical;
 pub mod kilo;
+// TEMPORARY DEBUG: Kilo proxy 原文日志；调试完成后删除此行与 kilo_debug.rs
+pub(crate) mod kilo_debug;
 pub mod log_codes;
 pub(crate) mod loopback_probe;
 pub mod media_sanitizer;

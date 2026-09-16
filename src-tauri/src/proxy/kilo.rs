@@ -18,7 +18,8 @@ use crate::{
     proxy::{
         content_encoding::{decompress_body, get_content_encoding, is_supported_content_encoding},
         handler_config::KILO_PARSER_CONFIG,
-        hyper_client::{send_request, MAX_RESPONSE_BODY_BYTES},
+        hyper_client::{send_request, ProxyResponse, MAX_RESPONSE_BODY_BYTES},
+        kilo_debug,
         response_processor::{process_response, usage_logging_enabled, ResponseContext},
         server::ProxyState,
         session::extract_session_id,
@@ -142,7 +143,6 @@ pub(crate) fn reachability_base_url(provider: &Provider) -> Result<String, AppEr
 const APP_TYPE: &str = "kilo";
 const TAG: &str = "Kilo";
 const MAX_REQUEST_BODY_BYTES: usize = 200 * 1024 * 1024;
-
 /// Kilo 旁路统计上下文：在一次请求生命周期内捕获实际 Provider、CC-Switch
 /// 配置的出站模型、session ID 和流式标记，供成功/失败路径统一写入
 /// `app_type = kilo` 的代理统计记录。统计写入失败不影响业务响应。
@@ -336,6 +336,7 @@ pub async fn handle_chat_completions(
             "Kilo proxy channel is disabled",
         ));
     }
+    let request_id = kilo_debug::new_request_id();
     let config = state
         .db
         .get_proxy_config_for_app(APP_TYPE)
@@ -369,6 +370,7 @@ pub async fn handle_chat_completions(
         ));
     }
     body_bytes = decode_request_body(&mut headers, body_bytes)?;
+    kilo_debug::log_request_in(&request_id, &body_bytes);
     let mut body: Value = serde_json::from_slice(&body_bytes).map_err(|e| {
         kilo_error(
             StatusCode::BAD_REQUEST,
@@ -495,6 +497,7 @@ pub async fn handle_chat_completions(
             e.to_string(),
         )
     })?;
+    kilo_debug::log_request_out(&request_id, &request_body);
     let mut outbound_headers = filtered_request_headers(&headers);
     outbound_headers.insert(
         header::CONTENT_TYPE,
@@ -577,6 +580,20 @@ pub async fn handle_chat_completions(
             }
             let response_ctx =
                 ResponseContext::for_kilo(started, session_id.clone(), outbound_model.clone());
+            let response = if response.is_sse() {
+                // 【临时调试】在 SSE 透传流外包一层 kilo_debug tee，按完整 event 聚合
+                // 并在 Run 结束时输出 RESP_IN_FROM_PROVIDER / RESP_OUT_TO_KILO 日志。
+                let status = response.status();
+                let headers = response.headers().clone();
+                let stream = response.bytes_stream();
+                ProxyResponse::streamed(
+                    status,
+                    headers.clone(),
+                    kilo_debug::sse_event_tee(stream, request_id.clone(), headers),
+                )
+            } else {
+                response
+            };
             match process_response(
                 response,
                 &response_ctx,
