@@ -54,30 +54,6 @@ export const geminiProviderPresets: GeminiProviderPreset[] = [
   },
   // ===== 赞助商预设：文件顺序与 README 赞助商表对齐（仅维护约定；应用内一律按显示名排序，不置顶）=====
   {
-    name: "PackyCode",
-    websiteUrl: "https://www.packyapi.ai",
-    apiKeyUrl: "https://www.packyapi.ai/register?aff=cc-switch",
-    settingsConfig: {
-      env: {
-        GOOGLE_GEMINI_BASE_URL: "https://www.packyapi.ai",
-        GEMINI_MODEL: "gemini-3.6-flash",
-      },
-    },
-    baseURL: "https://www.packyapi.ai",
-    model: "gemini-3.6-flash",
-    description: "PackyCode",
-    category: "third_party",
-    isPartner: true,
-    partnerPromotionKey: "packycode",
-    endpointCandidates: [
-      "https://www.packyapi.ai",
-      "https://cf.api.fan",
-      "https://slb-v1.api.fan",
-      "https://www.packyapi.com",
-    ],
-    icon: "packycode",
-  },
-  {
     name: "APINebula",
     websiteUrl: "https://apinebula.ai",
     apiKeyUrl: "https://apinebula.ai/VjM74M",
@@ -282,30 +258,6 @@ export const geminiProviderPresets: GeminiProviderPreset[] = [
       "https://slb.apikey.fun",
     ],
     icon: "apikeyfun",
-  },
-  {
-    name: "9527CODE",
-    websiteUrl: "https://9527.codes",
-    apiKeyUrl: "https://9527.codes/register?aff=e5zI",
-    settingsConfig: {
-      env: {
-        GOOGLE_GEMINI_BASE_URL: "https://9527.codes",
-        GEMINI_API_KEY: "",
-        GEMINI_MODEL: "gemini-3.6-flash",
-      },
-    },
-    baseURL: "https://9527.codes",
-    model: "gemini-3.6-flash",
-    description: "9527CODE",
-    category: "aggregator",
-    isPartner: true,
-    partnerPromotionKey: "9527code",
-    endpointCandidates: [
-      "https://9527.codes",
-      "https://api.9527.codes",
-      "https://cdn.9527.codes",
-    ],
-    icon: "9527code",
   },
   {
     name: "Code0",
