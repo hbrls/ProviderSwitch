@@ -437,27 +437,6 @@ export const codexProviderPresets: CodexProviderPreset[] = [
     iconColor: "#6366F1",
   },
   {
-    name: "PackyCode",
-    websiteUrl: "https://www.packyapi.ai",
-    apiKeyUrl: "https://www.packyapi.ai/register?aff=cc-switch",
-    category: "third_party",
-    auth: generateThirdPartyAuth(""),
-    config: generateThirdPartyConfig(
-      "packycode",
-      "https://www.packyapi.ai/v1",
-      "gpt-5.6-sol",
-    ),
-    endpointCandidates: [
-      "https://www.packyapi.ai/v1",
-      "https://cf.api.fan/v1",
-      "https://slb-v1.api.fan/v1",
-      "https://www.packyapi.com/v1",
-    ],
-    isPartner: true, // 合作伙伴
-    partnerPromotionKey: "packycode", // 促销信息 i18n key
-    icon: "packycode",
-  },
-  {
     name: "ZetaAPI",
     websiteUrl: "https://zetaapi.ai",
     apiKeyUrl: "https://zetaapi.ai/go/u117",
@@ -808,26 +787,6 @@ requires_openai_auth = true`,
     isPartner: true,
     partnerPromotionKey: "apikeyfun",
     icon: "apikeyfun",
-  },
-  {
-    name: "9527CODE",
-    websiteUrl: "https://9527.codes",
-    apiKeyUrl: "https://9527.codes/register?aff=e5zI",
-    category: "aggregator",
-    auth: generateThirdPartyAuth(""),
-    config: generateThirdPartyConfig(
-      "9527code",
-      "https://9527.codes/v1",
-      "gpt-5.6-sol",
-    ),
-    endpointCandidates: [
-      "https://9527.codes/v1",
-      "https://api.9527.codes/v1",
-      "https://cdn.9527.codes/v1",
-    ],
-    isPartner: true,
-    partnerPromotionKey: "9527code",
-    icon: "9527code",
   },
   {
     name: "Code0",

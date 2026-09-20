@@ -188,7 +188,7 @@ export interface ProviderMeta {
   endpointAutoSelect?: boolean;
   // 是否为官方合作伙伴
   isPartner?: boolean;
-  // 合作伙伴促销 key（用于后端识别 PackyCode 等）
+  // 合作伙伴促销 key（用于后端识别特殊供应商）
   partnerPromotionKey?: string;
   // API 格式（Claude / Codex 供应商使用）
   // - "anthropic": 原生 Anthropic Messages API 格式，直接透传
