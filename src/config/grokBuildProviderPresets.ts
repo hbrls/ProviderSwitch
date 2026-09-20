@@ -82,23 +82,6 @@ requires_openai_auth = true`;
 export const grokBuildProviderPresets: GrokBuildProviderPreset[] = [
   // ===== 赞助商预设：文件顺序与 README 赞助商表对齐（仅维护约定；应用内一律按显示名排序，不置顶）=====
   {
-    name: "PackyCode",
-    websiteUrl: "https://www.packyapi.ai",
-    apiKeyUrl: "https://www.packyapi.ai/register?aff=cc-switch",
-    auth: grokAuth(),
-    config: grokPresetConfig("PackyCode", "https://www.packyapi.ai/v1"),
-    endpointCandidates: [
-      "https://www.packyapi.ai/v1",
-      "https://cf.api.fan/v1",
-      "https://slb-v1.api.fan/v1",
-      "https://www.packyapi.com/v1",
-    ],
-    category: "third_party",
-    isPartner: true,
-    partnerPromotionKey: "packycode",
-    icon: "packycode",
-  },
-  {
     name: "ZetaAPI",
     websiteUrl: "https://zetaapi.ai",
     apiKeyUrl: "https://zetaapi.ai/go/u117",
@@ -295,22 +278,6 @@ export const grokBuildProviderPresets: GrokBuildProviderPreset[] = [
     isPartner: true,
     partnerPromotionKey: "apikeyfun",
     icon: "apikeyfun",
-  },
-  {
-    name: "9527CODE",
-    websiteUrl: "https://9527.codes",
-    apiKeyUrl: "https://9527.codes/register?aff=e5zI",
-    auth: grokAuth(),
-    config: grokPresetConfig("9527CODE", "https://9527.codes/v1"),
-    endpointCandidates: [
-      "https://9527.codes/v1",
-      "https://api.9527.codes/v1",
-      "https://cdn.9527.codes/v1",
-    ],
-    category: "aggregator",
-    isPartner: true,
-    partnerPromotionKey: "9527code",
-    icon: "9527code",
   },
   {
     name: "Code0",

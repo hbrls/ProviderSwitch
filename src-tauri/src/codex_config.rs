@@ -4828,7 +4828,7 @@ wire_api = "responses"
         // NOT blacklisted → keep Codex default (relays/GPT, DouBao, general Qwen,
         // and any unknown provider incl. an aggregator serving a non-reject model).
         for (model, host) in [
-            ("gpt-5.5", "https://www.packyapi.com/v1"),
+            ("gpt-5.5", "https://example.com/v1"),
             ("gpt-5-codex", "https://aihubmix.com/v1"),
             (
                 "doubao-seed-2-1-pro-260628",
