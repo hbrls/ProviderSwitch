@@ -95,7 +95,9 @@ export function UsageDataSourcesSheet({
 }: UsageDataSourcesSheetProps) {
   const { t, i18n } = useTranslation();
   const coveredApps = joinNames(
-    KNOWN_APP_TYPES.map((app) => APP_DISPLAY_NAME[app]),
+    KNOWN_APP_TYPES.filter((app) => app !== "kilo").map(
+      (app) => APP_DISPLAY_NAME[app],
+    ),
     getResolvedLang(i18n),
   );
   const cadence = sessionAutoSyncEnabled

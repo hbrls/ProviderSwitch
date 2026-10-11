@@ -4,7 +4,6 @@
 //! 基础设施，不进入 Codex 的 handler、adapter 或请求转换流程。
 
 use axum::{
-    body::Body,
     extract::State,
     http::{header, HeaderMap, HeaderName, HeaderValue, Method, StatusCode, Uri},
     response::{IntoResponse, Response},
@@ -18,11 +17,12 @@ use crate::{
     provider::Provider,
     proxy::{
         content_encoding::{decompress_body, get_content_encoding, is_supported_content_encoding},
-        hyper_client::{send_request, ProxyResponse, MAX_RESPONSE_BODY_BYTES},
-        response_processor::{
-            strip_entity_headers_for_rebuilt_body, strip_hop_by_hop_response_headers,
-        },
+        handler_config::KILO_PARSER_CONFIG,
+        hyper_client::{send_request, MAX_RESPONSE_BODY_BYTES},
+        response_processor::{process_response, usage_logging_enabled, ResponseContext},
         server::ProxyState,
+        session::extract_session_id,
+        usage::logger::UsageLogger,
         ProxyError,
     },
 };
@@ -30,6 +30,17 @@ use crate::{
 const APP_TYPE: &str = "kilo";
 const TAG: &str = "Kilo";
 const MAX_REQUEST_BODY_BYTES: usize = 200 * 1024 * 1024;
+
+/// Kilo 旁路统计上下文：在一次请求生命周期内捕获实际 Provider、CC-Switch
+/// 配置的出站模型、session ID 和流式标记，供成功/失败路径统一写入
+/// `app_type = kilo` 的代理统计记录。统计写入失败不影响业务响应。
+#[derive(Debug, Clone)]
+struct KiloUsageContext {
+    provider_id: String,
+    outbound_model: String,
+    session_id: String,
+    is_stream: bool,
+}
 
 #[derive(Debug, Clone)]
 pub struct KiloProviderConfig {
@@ -320,6 +331,13 @@ pub async fn handle_chat_completions(
             ));
         }
     };
+    // Capture server-owned routing context before the body is rewritten.
+    // CC-Switch's configured model is authoritative for Kilo; Kilo does not
+    // provide a meaningful request-side model.
+    let outbound_model = provider_config.model.clone();
+    // Kilo outbound requests are always forced to streaming mode by CC-Switch.
+    let is_stream = true;
+    let session_id = extract_session_id(&headers, &body, APP_TYPE).session_id;
     // Routing is entirely server-owned. Ignore any client-supplied model
     // or provider selector fields instead of forwarding them upstream.
     if let Some(object) = body.as_object_mut() {
@@ -330,8 +348,26 @@ pub async fn handle_chat_completions(
             "model".to_string(),
             Value::String(provider_config.model.clone()),
         );
+        object.insert("stream".to_string(), Value::Bool(true));
     }
     apply_provider_request_overrides(&mut body, &provider_config);
+    // Always request usage in the final streaming chunk.
+    if let Some(object) = body.as_object_mut() {
+        let stream_options = object
+            .entry("stream_options".to_string())
+            .or_insert_with(|| json!({}));
+        if let Some(opts) = stream_options.as_object_mut() {
+            opts.insert("include_usage".to_string(), json!(true));
+        } else {
+            *stream_options = json!({ "include_usage": true });
+        }
+    }
+    let usage_ctx = KiloUsageContext {
+        provider_id: provider.id.clone(),
+        outbound_model: outbound_model.clone(),
+        session_id: session_id.clone(),
+        is_stream,
+    };
     let url = format!("{}/chat/completions", provider_config.base_url);
     let uri: Uri = url.parse().map_err(|error| {
         kilo_error(
@@ -408,7 +444,24 @@ pub async fn handle_chat_completions(
                 status.current_provider = Some(provider.name.clone());
                 status.current_provider_id = Some(provider.id.clone());
             }
-            return build_response(response, &state, &provider, started, false).await;
+            let response_ctx =
+                ResponseContext::for_kilo(started, session_id.clone(), outbound_model.clone());
+            match process_response(
+                response,
+                &response_ctx,
+                &state,
+                &KILO_PARSER_CONFIG,
+                None,
+                &provider.id,
+            )
+            .await
+            {
+                Ok(response) => {
+                    record_success(&state, &provider, started, false).await;
+                    return Ok(response);
+                }
+                Err(error) => error,
+            }
         }
         Ok(response) => {
             let status = response.status();
@@ -484,6 +537,22 @@ pub async fn handle_chat_completions(
                 (metrics.success_requests as f32 / metrics.total_requests as f32) * 100.0;
         }
     }
+    // 旁路记录可归属到实际 Provider 的失败请求：保留请求数和上游 status code，
+    // 不因缺少 usage 就丢失统计。统计写入失败不改变业务错误响应。
+    let error_status_code = match &error {
+        ProxyError::UpstreamError { status, .. } => *status,
+        _ => 0,
+    };
+    spawn_kilo_error_log(
+        &state,
+        &usage_ctx.provider_id,
+        &usage_ctx.outbound_model,
+        usage_ctx.is_stream,
+        Some(usage_ctx.session_id.clone()),
+        error_status_code,
+        error.to_string(),
+        started.elapsed().as_millis() as u64,
+    );
     Err(kilo_error(status, code, message))
 }
 
@@ -544,64 +613,6 @@ fn timeout_for(config: &crate::proxy::types::AppProxyConfig) -> Duration {
     Duration::from_secs(config.non_streaming_timeout.max(1) as u64)
 }
 
-async fn build_response(
-    response: ProxyResponse,
-    state: &ProxyState,
-    provider: &Provider,
-    started: std::time::Instant,
-    used_half_open_permit: bool,
-) -> Result<Response, Response> {
-    let status = response.status();
-    let is_stream = response.is_sse();
-    let mut headers = response.headers().clone();
-    strip_hop_by_hop_response_headers(&mut headers);
-    if is_stream {
-        let stream = response.bytes_stream();
-        let mut builder = Response::builder().status(status);
-        for (name, value) in &headers {
-            builder = builder.header(name, value);
-        }
-        let response = builder.body(Body::from_stream(stream)).map_err(|e| {
-            kilo_error(
-                StatusCode::INTERNAL_SERVER_ERROR,
-                "internal_error",
-                e.to_string(),
-            )
-        })?;
-        record_success(state, provider, started, used_half_open_permit).await;
-        return Ok(response);
-    }
-
-    let bytes = response
-        .bytes_with_limit(MAX_RESPONSE_BODY_BYTES)
-        .await
-        .map_err(|e| {
-            kilo_error(
-                StatusCode::BAD_GATEWAY,
-                "upstream_unavailable",
-                e.to_string(),
-            )
-        })?;
-    strip_entity_headers_for_rebuilt_body(&mut headers);
-    headers.insert(
-        header::CONTENT_LENGTH,
-        HeaderValue::from_str(&bytes.len().to_string()).unwrap(),
-    );
-    let mut builder = Response::builder().status(status);
-    for (name, value) in &headers {
-        builder = builder.header(name, value);
-    }
-    let response = builder.body(Body::from(bytes)).map_err(|e| {
-        kilo_error(
-            StatusCode::INTERNAL_SERVER_ERROR,
-            "internal_error",
-            e.to_string(),
-        )
-    })?;
-    record_success(state, provider, started, used_half_open_permit).await;
-    Ok(response)
-}
-
 async fn record_success(
     state: &ProxyState,
     provider: &Provider,
@@ -624,6 +635,44 @@ async fn record_success(
             (status.success_requests as f32 / status.total_requests as f32) * 100.0;
     }
     let _ = started;
+}
+
+/// 异步记录 Kilo 失败请求的错误统计行。归属实际 provider_id，保留请求数和
+/// 上游 status code。统计写入失败只记 warn，不改变业务错误响应。
+fn spawn_kilo_error_log(
+    state: &ProxyState,
+    provider_id: &str,
+    model: &str,
+    is_streaming: bool,
+    session_id: Option<String>,
+    status_code: u16,
+    error_message: String,
+    latency_ms: u64,
+) {
+    if !usage_logging_enabled(state) {
+        return;
+    }
+    let db = state.db.clone();
+    let provider_id = provider_id.to_string();
+    let model = model.to_string();
+    let app_type = APP_TYPE.to_string();
+    tokio::spawn(async move {
+        let logger = UsageLogger::new(&db);
+        if let Err(e) = logger.log_error_with_context(
+            uuid::Uuid::new_v4().to_string(),
+            provider_id,
+            app_type,
+            model,
+            status_code,
+            error_message,
+            latency_ms,
+            is_streaming,
+            session_id,
+            None,
+        ) {
+            log::warn!("[{TAG}] 记录 Kilo 错误统计失败: {e}");
+        }
+    });
 }
 
 fn kilo_error(status: StatusCode, code: &str, message: impl Into<String>) -> Response {

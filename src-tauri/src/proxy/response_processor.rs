@@ -24,7 +24,7 @@ use std::{
         atomic::{AtomicBool, Ordering},
         Arc, OnceLock,
     },
-    time::Duration,
+    time::{Duration, Instant},
 };
 use tokio::sync::Mutex;
 
@@ -137,6 +137,113 @@ pub(crate) async fn read_decoded_body(
     Ok((headers, status, body_bytes))
 }
 
+/// 读取原始响应体，不改变实体头或响应字节。
+pub(crate) async fn read_raw_body(
+    response: ProxyResponse,
+    tag: &str,
+    body_timeout: Duration,
+) -> Result<(HeaderMap, http::StatusCode, Bytes), ProxyError> {
+    let headers = response.headers().clone();
+    let status = response.status();
+    let bytes_future = response.bytes_with_limit(MAX_RESPONSE_BODY_BYTES);
+    let body = if body_timeout.is_zero() {
+        bytes_future.await?
+    } else {
+        tokio::time::timeout(body_timeout, bytes_future)
+            .await
+            .map_err(|_| {
+                ProxyError::Timeout(format!(
+                    "响应体读取超时: {}s（上游发完响应头后 body 未到达）",
+                    body_timeout.as_secs()
+                ))
+            })??
+    };
+
+    log::debug!(
+        "[{tag}] 已接收上游原始响应体: status={}, bytes={}, headers={}",
+        status.as_u16(),
+        body.len(),
+        format_headers(&headers)
+    );
+
+    Ok((headers, status, body))
+}
+
+/// 为 usage 解析解压副本；解析失败不能改变原始透传响应。
+fn decode_body_for_observation(headers: &HeaderMap, raw_body: &Bytes, tag: &str) -> Bytes {
+    let Some(encoding) = get_content_encoding(headers) else {
+        return raw_body.clone();
+    };
+
+    match decompress_body_with_limit(&encoding, raw_body, MAX_RESPONSE_BODY_BYTES) {
+        Ok(Some(decoded)) => Bytes::from(decoded),
+        Ok(None) => raw_body.clone(),
+        Err(error) => {
+            log::debug!("[{tag}] usage 解析副本解压失败 ({encoding}): {error}");
+            raw_body.clone()
+        }
+    }
+}
+
+/// 响应阶段上下文。
+///
+/// 该类型只包含响应处理和观测所需的信息，不包含 Provider 选择、故障转移
+/// 或请求改写状态。Provider 的业务归因通过 `process_response` 的最后一个
+/// `provider_id` 参数传入。
+#[derive(Clone)]
+pub struct ResponseContext {
+    pub start_time: Instant,
+    pub tag: &'static str,
+    pub app_type_str: &'static str,
+    pub request_model: Option<String>,
+    pub outbound_model: Option<String>,
+    pub session_id: Option<String>,
+    pub streaming_timeout: StreamingTimeoutConfig,
+    pub non_streaming_timeout: Duration,
+    /// Kilo 必须保持上游非流式响应的原始字节和实体头。
+    pub preserve_body: bool,
+}
+
+impl ResponseContext {
+    pub fn from_request(ctx: &RequestContext) -> Self {
+        let non_streaming_timeout =
+            if ctx.app_config.auto_failover_enabled && ctx.app_config.non_streaming_timeout > 0 {
+                Duration::from_secs(ctx.app_config.non_streaming_timeout as u64)
+            } else {
+                Duration::ZERO
+            };
+
+        Self {
+            start_time: ctx.start_time,
+            tag: ctx.tag,
+            app_type_str: ctx.app_type_str,
+            request_model: Some(ctx.request_model.clone()),
+            outbound_model: ctx.outbound_model.clone(),
+            session_id: Some(ctx.session_id.clone()),
+            streaming_timeout: ctx.streaming_timeout_config(),
+            non_streaming_timeout,
+            preserve_body: false,
+        }
+    }
+
+    pub fn for_kilo(start_time: Instant, session_id: String, outbound_model: String) -> Self {
+        Self {
+            start_time,
+            tag: "Kilo",
+            app_type_str: "kilo",
+            request_model: None,
+            outbound_model: Some(outbound_model),
+            session_id: Some(session_id),
+            streaming_timeout: StreamingTimeoutConfig {
+                first_byte_timeout: 0,
+                idle_timeout: 0,
+            },
+            non_streaming_timeout: Duration::ZERO,
+            preserve_body: true,
+        }
+    }
+}
+
 // ============================================================================
 // 公共接口
 // ============================================================================
@@ -160,10 +267,11 @@ pub fn is_sse_response(response: &ProxyResponse, request_is_stream: bool) -> boo
 /// 处理流式响应
 pub async fn handle_streaming(
     response: ProxyResponse,
-    ctx: &RequestContext,
+    ctx: &ResponseContext,
     state: &ProxyState,
     parser_config: &UsageParserConfig,
     connection_guard: Option<ActiveConnectionGuard>,
+    provider_id: &str,
 ) -> Response {
     let status = response.status();
     log::debug!(
@@ -195,10 +303,11 @@ pub async fn handle_streaming(
     let stream = response.bytes_stream();
 
     // 创建使用量收集器；关闭 usage logging 时不要在流式热路径上解析每个 SSE event。
-    let usage_collector = create_usage_collector(ctx, state, status.as_u16(), parser_config);
+    let usage_collector =
+        create_usage_collector(ctx, state, status.as_u16(), parser_config, provider_id);
 
     // 获取流式超时配置
-    let timeout_config = ctx.streaming_timeout_config();
+    let timeout_config = ctx.streaming_timeout;
 
     // 创建带日志和超时的透传流
     let logged_stream = create_logged_passthrough_stream(
@@ -222,21 +331,23 @@ pub async fn handle_streaming(
 /// 处理非流式响应
 pub async fn handle_non_streaming(
     response: ProxyResponse,
-    ctx: &RequestContext,
+    ctx: &ResponseContext,
     state: &ProxyState,
     parser_config: &UsageParserConfig,
     // guard 在函数 scope 内持有，整包响应读取完成后随函数返回一并 drop
     _connection_guard: Option<ActiveConnectionGuard>,
+    provider_id: &str,
 ) -> Result<Response, ProxyError> {
-    // 整包超时：仅在故障转移开启且配置值非零时生效
-    let body_timeout =
-        if ctx.app_config.auto_failover_enabled && ctx.app_config.non_streaming_timeout > 0 {
-            Duration::from_secs(ctx.app_config.non_streaming_timeout as u64)
-        } else {
-            Duration::ZERO
-        };
-    let (mut response_headers, status, body_bytes) =
-        read_decoded_body(response, ctx.tag, body_timeout).await?;
+    let (mut response_headers, status, response_body) = if ctx.preserve_body {
+        read_raw_body(response, ctx.tag, ctx.non_streaming_timeout).await?
+    } else {
+        read_decoded_body(response, ctx.tag, ctx.non_streaming_timeout).await?
+    };
+    let body_bytes = if ctx.preserve_body {
+        decode_body_for_observation(&response_headers, &response_body, ctx.tag)
+    } else {
+        response_body.clone()
+    };
     strip_hop_by_hop_response_headers(&mut response_headers);
 
     log::debug!(
@@ -252,43 +363,34 @@ pub async fn handle_non_streaming(
             if let Some(usage) = (parser_config.response_parser)(&json_value) {
                 // 归因优先级：usage 解析出的模型 → 响应 model 字段 → 映射后的出站
                 // 模型（路由接管真值）→ 客户端请求模型。空字符串视为缺失。
-                let model = usage
-                    .model
-                    .clone()
-                    .filter(|m| !m.is_empty())
-                    .or_else(|| {
-                        json_value
-                            .get("model")
-                            .and_then(|m| m.as_str())
-                            .filter(|m| !m.is_empty())
-                            .map(str::to_string)
-                    })
-                    .or_else(|| ctx.outbound_model.clone())
-                    .unwrap_or_else(|| ctx.request_model.clone());
+                let model = response_model(
+                    ctx,
+                    usage.model.clone(),
+                    json_value.get("model").and_then(|m| m.as_str()),
+                );
+                let request_model = ctx.request_model.as_deref().unwrap_or(model.as_str());
 
                 spawn_log_usage(
                     state,
                     ctx,
+                    provider_id,
                     usage,
                     &model,
-                    &ctx.request_model,
+                    request_model,
                     status.as_u16(),
                     false,
                 );
             } else {
-                let model = json_value
-                    .get("model")
-                    .and_then(|m| m.as_str())
-                    .filter(|m| !m.is_empty())
-                    .map(str::to_string)
-                    .or_else(|| ctx.outbound_model.clone())
-                    .unwrap_or_else(|| ctx.request_model.clone());
+                let model =
+                    response_model(ctx, None, json_value.get("model").and_then(|m| m.as_str()));
+                let request_model = ctx.request_model.as_deref().unwrap_or(model.as_str());
                 spawn_log_usage(
                     state,
                     ctx,
+                    provider_id,
                     TokenUsage::default(),
                     &model,
-                    &ctx.request_model,
+                    request_model,
                     status.as_u16(),
                     false,
                 );
@@ -303,12 +405,15 @@ pub async fn handle_non_streaming(
                 ctx.tag,
                 body_bytes.len()
             );
+            let model = response_model(ctx, None, None);
+            let request_model = ctx.request_model.as_deref().unwrap_or(model.as_str());
             spawn_log_usage(
                 state,
                 ctx,
+                provider_id,
                 TokenUsage::default(),
-                ctx.outbound_model.as_deref().unwrap_or(&ctx.request_model),
-                &ctx.request_model,
+                &model,
+                request_model,
                 status.as_u16(),
                 false,
             );
@@ -323,7 +428,7 @@ pub async fn handle_non_streaming(
         builder = builder.header(key, value);
     }
 
-    let body = axum::body::Body::from(body_bytes);
+    let body = axum::body::Body::from(response_body);
     builder.body(body).map_err(|e| {
         log::error!("[{}] 构建响应失败: {e}", ctx.tag);
         ProxyError::Internal(format!("Failed to build response: {e}"))
@@ -335,16 +440,25 @@ pub async fn handle_non_streaming(
 /// 根据响应类型自动选择流式或非流式处理
 pub async fn process_response(
     response: ProxyResponse,
-    ctx: &RequestContext,
+    ctx: &ResponseContext,
     state: &ProxyState,
     parser_config: &UsageParserConfig,
     request_is_stream: bool,
     connection_guard: Option<ActiveConnectionGuard>,
+    provider_id: &str,
 ) -> Result<Response, ProxyError> {
     if is_sse_response(&response, request_is_stream) {
         Ok(handle_streaming(response, ctx, state, parser_config, connection_guard).await)
     } else {
-        handle_non_streaming(response, ctx, state, parser_config, connection_guard).await
+        handle_non_streaming(
+            response,
+            ctx,
+            state,
+            parser_config,
+            connection_guard,
+            provider_id,
+        )
+        .await
     }
 }
 
@@ -492,12 +606,37 @@ impl Drop for SseUsageFinishGuard {
 // 内部辅助函数
 // ============================================================================
 
+fn response_model(
+    ctx: &ResponseContext,
+    response_usage_model: Option<String>,
+    response_model: Option<&str>,
+) -> String {
+    if ctx.app_type_str == "kilo" {
+        return ctx
+            .outbound_model
+            .clone()
+            .unwrap_or_else(|| "unknown".to_string());
+    }
+
+    response_usage_model
+        .filter(|model| !model.is_empty())
+        .or_else(|| {
+            response_model
+                .filter(|model| !model.is_empty())
+                .map(str::to_string)
+        })
+        .or_else(|| ctx.outbound_model.clone())
+        .or_else(|| ctx.request_model.clone())
+        .unwrap_or_else(|| "unknown".to_string())
+}
+
 /// 创建使用量收集器
 pub(crate) fn create_usage_collector(
-    ctx: &RequestContext,
+    ctx: &ResponseContext,
     state: &ProxyState,
     status_code: u16,
     parser_config: &UsageParserConfig,
+    provider_id: &str,
 ) -> Option<SseUsageCollector> {
     let logging_enabled = state
         .config
@@ -509,14 +648,15 @@ pub(crate) fn create_usage_collector(
     }
 
     let state = state.clone();
-    let provider_id = ctx.provider.id.clone();
+    let provider_id = provider_id.to_string();
     let request_model = ctx.request_model.clone();
     // 流式事件缺失模型名时的归因兜底：映射后的出站模型（路由接管真值）优先，
     // 其次才是客户端请求别名
     let fallback_model = ctx
         .outbound_model
         .clone()
-        .unwrap_or_else(|| ctx.request_model.clone());
+        .or_else(|| ctx.request_model.clone())
+        .unwrap_or_else(|| "unknown".to_string());
     // 用 ctx 的 app_type 而不是 parser_config 的：Claude Desktop 流式透传复用
     // CLAUDE_PARSER_CONFIG（app_type_str="claude"），按 parser_config 记账会把
     // claude-desktop 的行错记到 claude 名下，导致供应商计价覆盖解析不到。
@@ -526,19 +666,24 @@ pub(crate) fn create_usage_collector(
     let stream_parser = parser_config.stream_parser;
     let model_extractor = parser_config.model_extractor;
     let session_id = ctx.session_id.clone();
+    let is_kilo = ctx.app_type_str == "kilo";
 
     Some(SseUsageCollector::new(
         start_time,
         parser_config.stream_event_filter,
         move |events, first_token_ms| {
             if let Some(usage) = stream_parser(&events) {
-                let model = model_extractor(&events, &fallback_model);
+                let model = if is_kilo {
+                    fallback_model.clone()
+                } else {
+                    model_extractor(&events, &fallback_model)
+                };
                 let latency_ms = start_time.elapsed().as_millis() as u64;
 
                 let state = state.clone();
                 let provider_id = provider_id.clone();
                 let session_id = session_id.clone();
-                let request_model = request_model.clone();
+                let request_model = request_model.clone().unwrap_or_else(|| model.clone());
                 let outbound_model = fallback_model.clone();
 
                 tokio::spawn(async move {
@@ -554,17 +699,21 @@ pub(crate) fn create_usage_collector(
                         first_token_ms,
                         true, // is_streaming
                         status_code,
-                        Some(session_id),
+                        session_id,
                     )
                     .await;
                 });
             } else {
-                let model = model_extractor(&events, &fallback_model);
+                let model = if is_kilo {
+                    fallback_model.clone()
+                } else {
+                    model_extractor(&events, &fallback_model)
+                };
                 let latency_ms = start_time.elapsed().as_millis() as u64;
                 let state = state.clone();
                 let provider_id = provider_id.clone();
                 let session_id = session_id.clone();
-                let request_model = request_model.clone();
+                let request_model = request_model.clone().unwrap_or_else(|| model.clone());
                 let outbound_model = fallback_model.clone();
 
                 tokio::spawn(async move {
@@ -580,7 +729,7 @@ pub(crate) fn create_usage_collector(
                         first_token_ms,
                         true, // is_streaming
                         status_code,
-                        Some(session_id),
+                        session_id,
                     )
                     .await;
                 });
@@ -593,7 +742,8 @@ pub(crate) fn create_usage_collector(
 /// 异步记录使用量
 fn spawn_log_usage(
     state: &ProxyState,
-    ctx: &RequestContext,
+    ctx: &ResponseContext,
+    provider_id: &str,
     usage: TokenUsage,
     model: &str,
     request_model: &str,
@@ -608,7 +758,7 @@ fn spawn_log_usage(
     }
 
     let state = state.clone();
-    let provider_id = ctx.provider.id.clone();
+    let provider_id = provider_id.to_string();
     let app_type_str = ctx.app_type_str.to_string();
     let model = model.to_string();
     let request_model = request_model.to_string();
@@ -616,8 +766,9 @@ fn spawn_log_usage(
     let outbound_model = ctx
         .outbound_model
         .clone()
-        .unwrap_or_else(|| ctx.request_model.clone());
-    let latency_ms = ctx.latency_ms();
+        .or_else(|| ctx.request_model.clone())
+        .unwrap_or_else(|| model.to_string());
+    let latency_ms = ctx.start_time.elapsed().as_millis() as u64;
     let session_id = ctx.session_id.clone();
 
     tokio::spawn(async move {
@@ -633,7 +784,7 @@ fn spawn_log_usage(
             None,
             is_streaming,
             status_code,
-            Some(session_id),
+            session_id,
         )
         .await;
     });
@@ -653,8 +804,12 @@ pub(crate) fn usage_logging_enabled(state: &ProxyState) -> bool {
 /// （路由接管映射后的真值，无映射时等于 request_model）。该模式的语义是
 /// 「按代理发出的请求计价、不信任上游回显」，接管场景下发出的请求模型是
 /// 映射后的 Y 而非客户端别名 X，按 X 计价会用错定价表行。
+///
+/// 供通用响应处理器与 Kilo 旁路统计共用。Kilo 不经 `RequestContext`，
+/// 直接用实际 Provider、出站模型等上下文调用本函数，避免重新选择 Provider
+/// 或引入 Kilo 当前没有的故障转移/请求改写。
 #[allow(clippy::too_many_arguments)]
-async fn log_usage_internal(
+pub(crate) async fn log_usage_internal(
     state: &ProxyState,
     provider_id: &str,
     app_type: &str,
@@ -1018,6 +1173,24 @@ mod tests {
         assert!(formatted.contains("cf-ray=abc123-SJC"), "{formatted}");
         assert!(!formatted.contains("super-secret"), "{formatted}");
         assert!(!formatted.contains("cookie-secret"), "{formatted}");
+    }
+
+    #[test]
+    fn kilo_response_model_uses_captured_provider_model() {
+        let ctx = ResponseContext::for_kilo(
+            Instant::now(),
+            "session".to_string(),
+            "configured-model".to_string(),
+        );
+
+        assert_eq!(
+            response_model(
+                &ctx,
+                Some("upstream-response-model".to_string()),
+                Some("upstream-response-model"),
+            ),
+            "configured-model"
+        );
     }
 
     #[tokio::test]
