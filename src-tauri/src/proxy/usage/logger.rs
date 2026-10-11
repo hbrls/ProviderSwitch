@@ -4,7 +4,8 @@ use super::calculator::{CostBreakdown, CostCalculator, ModelPricing};
 use super::parser::TokenUsage;
 use crate::database::{Database, PRICING_SOURCE_REQUEST, PRICING_SOURCE_RESPONSE};
 use crate::error::AppError;
-use crate::services::sql_helpers::{INPUT_TOKEN_SEMANTICS_FRESH, INPUT_TOKEN_SEMANTICS_TOTAL};
+#[cfg(test)]
+use crate::services::sql_helpers::INPUT_TOKEN_SEMANTICS_TOTAL;
 use crate::services::usage_stats::{find_model_pricing_row, is_placeholder_pricing_model};
 use rusqlite::OptionalExtension;
 use rust_decimal::Decimal;
@@ -121,11 +122,7 @@ impl<'a> UsageLogger<'a> {
 
         let created_at = chrono::Utc::now().timestamp();
         let input_token_semantics =
-            if crate::services::sql_helpers::is_cache_inclusive_app(log.app_type.as_str()) {
-                INPUT_TOKEN_SEMANTICS_TOTAL
-            } else {
-                INPUT_TOKEN_SEMANTICS_FRESH
-            };
+            crate::services::sql_helpers::input_token_semantics_for_app(log.app_type.as_str());
         let semantic = UsageSemantic::from_log(log, input_token_semantics);
         let existing = Self::load_existing_semantic(&conn, &log.request_id)?;
 
@@ -728,6 +725,44 @@ mod tests {
             |row| row.get(0),
         )?;
         assert_eq!(semantics, INPUT_TOKEN_SEMANTICS_TOTAL);
+        Ok(())
+    }
+
+    #[test]
+    fn kilo_logs_legacy_input_token_semantics() -> Result<(), AppError> {
+        let db = Database::memory()?;
+        let logger = UsageLogger::new(&db);
+        let log = RequestLog {
+            request_id: "kilo-semantics".to_string(),
+            provider_id: "kilo-provider".to_string(),
+            app_type: "kilo".to_string(),
+            model: "kilo-model".to_string(),
+            request_model: "client-model".to_string(),
+            pricing_model: String::new(),
+            usage: TokenUsage::default(),
+            cost: None,
+            latency_ms: 1,
+            first_token_ms: None,
+            status_code: 200,
+            error_message: None,
+            session_id: None,
+            provider_type: None,
+            is_streaming: false,
+            cost_multiplier: "1".to_string(),
+        };
+
+        logger.log_request(&log)?;
+
+        let conn = crate::database::lock_conn!(db.conn);
+        let semantics: i64 = conn.query_row(
+            "SELECT input_token_semantics FROM proxy_request_logs WHERE request_id = 'kilo-semantics'",
+            [],
+            |row| row.get(0),
+        )?;
+        assert_eq!(
+            semantics,
+            crate::services::sql_helpers::INPUT_TOKEN_SEMANTICS_LEGACY
+        );
         Ok(())
     }
 }
