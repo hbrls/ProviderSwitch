@@ -1107,7 +1107,8 @@
       "noExtraOptions": "未配置额外选项",
       "optionKey": "选项键",
       "optionValue": "选项值",
-      "removeOption": "删除选项"
+      "removeOption": "删除选项",
+      "getApiKey": "获取 API Key"
     }
   },
   "pi": {
