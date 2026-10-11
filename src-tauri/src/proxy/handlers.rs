@@ -1171,6 +1171,7 @@ async fn handle_responses_for_app(
         .await;
     }
 
+    let response_ctx = ResponseContext::from_request(&ctx);
     process_response(
         response,
         &response_ctx,
@@ -1212,11 +1213,12 @@ async fn handle_codex_native_compaction_response(
     if !status.is_success() || !response.is_sse() {
         return process_response(
             response,
-            ctx,
+            &response_ctx,
             state,
             &CODEX_PARSER_CONFIG,
             false,
             connection_guard,
+            &ctx.provider.id,
         )
         .await;
     }
@@ -1496,6 +1498,7 @@ async fn handle_responses_compact_for_app(
         .await;
     }
 
+    let response_ctx = ResponseContext::from_request(&ctx);
     process_response(
         response,
         &response_ctx,
@@ -1518,14 +1521,16 @@ async fn handle_codex_late_arguments_repair(
     connection_guard: Option<ActiveConnectionGuard>,
 ) -> Result<axum::response::Response, ProxyError> {
     let status = response.status();
+    let response_ctx = ResponseContext::from_request(ctx);
     if !status.is_success() || !response.is_sse() {
         return process_response(
             response,
-            ctx,
+            &response_ctx,
             state,
             &CODEX_PARSER_CONFIG,
             is_stream,
             connection_guard,
+            &ctx.provider.id,
         )
         .await;
     }
@@ -1535,7 +1540,13 @@ async fn handle_codex_late_arguments_repair(
         super::providers::responses_late_arguments::create_late_arguments_repair_stream(
             response.bytes_stream(),
         );
-    let usage_collector = create_usage_collector(ctx, state, status.as_u16(), &CODEX_PARSER_CONFIG);
+    let usage_collector = create_usage_collector(
+        &response_ctx,
+        state,
+        status.as_u16(),
+        &CODEX_PARSER_CONFIG,
+        &ctx.provider.id,
+    );
     let logged_stream = create_logged_passthrough_stream(
         repair_stream,
         ctx.tag,
@@ -1574,11 +1585,12 @@ async fn handle_codex_xai_native_responses_rewrite(
     if !status.is_success() {
         return process_response(
             response,
-            ctx,
+            &response_ctx,
             state,
             &CODEX_PARSER_CONFIG,
             false,
             connection_guard,
+            &ctx.provider.id,
         )
         .await;
     }
