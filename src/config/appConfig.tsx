@@ -44,19 +44,6 @@ export const DEFAULT_VISIBLE_APPS: VisibleApps = {
   agy: true,
 };
 
-/** App IDs shown in Skills panels. */
-export const SKILLS_APP_IDS: AppId[] = [
-  "claude",
-  "codex",
-  "gemini",
-  "grokbuild",
-  "opencode",
-  "hermes",
-  "pi",
-  "mcode",
-  "agy",
-];
-
 export type ProxyAppId = Extract<
   AppId,
   "claude" | "codex" | "gemini" | "grokbuild"

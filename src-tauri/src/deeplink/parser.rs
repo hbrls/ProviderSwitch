@@ -60,7 +60,6 @@ pub fn parse_deeplink_url(url_str: &str) -> Result<DeepLinkImportRequest, AppErr
         "provider" => parse_provider_deeplink(&params, version, resource),
         "prompt" => parse_prompt_deeplink(&params, version, resource),
         "mcp" => parse_mcp_deeplink(&params, version, resource),
-        "skill" => parse_skill_deeplink(&params, version, resource),
         _ => Err(AppError::InvalidInput(format!(
             "Unsupported resource type: {resource}"
         ))),
@@ -205,9 +204,6 @@ fn parse_provider_deeplink(
         content: None,
         description: None,
         apps: None,
-        repo: None,
-        directory: None,
-        branch: None,
         config,
         config_format,
         config_url,
@@ -296,9 +292,6 @@ fn parse_prompt_deeplink(
         opus_model: None,
         api_format: None,
         apps: None,
-        repo: None,
-        directory: None,
-        branch: None,
         config: None,
         config_format: None,
         config_url: None,
@@ -375,9 +368,6 @@ fn parse_mcp_deeplink(
         api_format: None,
         content: None,
         description: None,
-        repo: None,
-        directory: None,
-        branch: None,
         config_url: None,
         icon_url: None,
         usage_enabled: None,
@@ -390,59 +380,3 @@ fn parse_mcp_deeplink(
     })
 }
 
-/// Parse skill deep link parameters
-fn parse_skill_deeplink(
-    params: &HashMap<String, String>,
-    version: String,
-    resource: String,
-) -> Result<DeepLinkImportRequest, AppError> {
-    let repo = params
-        .get("repo")
-        .ok_or_else(|| AppError::InvalidInput("Missing 'repo' parameter for skill".to_string()))?
-        .clone();
-
-    // Validate repo format (should be "owner/name")
-    if !repo.contains('/') || repo.split('/').count() != 2 {
-        return Err(AppError::InvalidInput(format!(
-            "Invalid repo format: expected 'owner/name', got '{repo}'"
-        )));
-    }
-
-    let directory = params.get("directory").cloned();
-    let branch = params.get("branch").cloned();
-
-    Ok(DeepLinkImportRequest {
-        version,
-        resource,
-        repo: Some(repo),
-        directory,
-        branch,
-        icon: None,
-        app: None, // Skill links add a shared repository; app installation is a separate action.
-        name: None,
-        enabled: None,
-        homepage: None,
-        endpoint: None,
-        api_key: None,
-        model: None,
-        notes: None,
-        haiku_model: None,
-        sonnet_model: None,
-        opus_model: None,
-        api_format: None,
-        content: None,
-        description: None,
-        apps: None,
-        config: None,
-        config_format: None,
-        config_url: None,
-        icon_url: None,
-        usage_enabled: None,
-        usage_script: None,
-        usage_api_key: None,
-        usage_base_url: None,
-        usage_access_token: None,
-        usage_user_id: None,
-        usage_auto_interval: None,
-    })
-}
