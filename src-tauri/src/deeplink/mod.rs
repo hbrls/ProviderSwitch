@@ -5,7 +5,6 @@
 //! - Provider configurations (Claude/Codex/Gemini)
 //! - MCP server configurations
 //! - Prompts
-//! - Skills
 //!
 
 mod codex_link;
@@ -15,7 +14,6 @@ mod mcp;
 mod parser;
 mod prompt;
 mod provider;
-mod skill;
 mod utils;
 
 #[cfg(test)]
@@ -31,7 +29,6 @@ pub use mcp::import_mcp_from_deeplink;
 pub use parser::parse_deeplink_url;
 pub use prompt::import_prompt_from_deeplink;
 pub use provider::{import_provider_from_deeplink, parse_and_merge_config};
-pub use skill::import_skill_from_deeplink;
 
 /// 等前端处理的深链接（解析结果或解析错误）
 ///
@@ -92,11 +89,11 @@ pub fn ack_pending_deeplink(id: u64) {
 pub struct DeepLinkImportRequest {
     /// Protocol version (e.g., "v1")
     pub version: String,
-    /// Resource type to import: "provider" | "prompt" | "mcp" | "skill"
+    /// Resource type to import: "provider" | "prompt" | "mcp"
     pub resource: String,
 
     // ============ Common fields ============
-    /// Target application (claude/codex/gemini) - for provider, prompt, skill
+    /// Target application (claude/codex/gemini) - for provider, prompt
     #[serde(skip_serializing_if = "Option::is_none")]
     pub app: Option<String>,
     /// Resource name
@@ -156,16 +153,6 @@ pub struct DeepLinkImportRequest {
     /// Target applications for MCP (comma-separated: "claude,codex,gemini")
     #[serde(skip_serializing_if = "Option::is_none")]
     pub apps: Option<String>,
-
-    // ============ Skill-specific fields ============
-    /// GitHub repository (format: "owner/name")
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub repo: Option<String>,
-    /// Skill directory name
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub directory: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub branch: Option<String>,
 
     // ============ Config file fields (v3.8+) ============
     /// Base64 encoded config content

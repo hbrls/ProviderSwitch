@@ -1,7 +1,7 @@
 //! S3 v2 sync protocol layer.
 //!
 //! Implements manifest-based synchronization on top of the S3 transport
-//! primitives in [`super::s3`]. Artifact set: `db.sql` + `skills.zip`.
+//! primitives in [`super::s3`]. Artifact set: `db.sql`.
 
 use std::collections::BTreeMap;
 
@@ -17,7 +17,7 @@ use super::sync_protocol::{
     apply_snapshot, build_local_snapshot, localized, persist_sync_success_best_effort, sha256_hex,
     validate_artifact_size_limit, validate_manifest_compat, verify_artifact, ArtifactMeta,
     RemoteLayout, SyncManifest, DB_COMPAT_VERSION, MAX_MANIFEST_BYTES, MAX_SYNC_ARTIFACT_BYTES,
-    PROTOCOL_VERSION, REMOTE_DB_SQL, REMOTE_MANIFEST, REMOTE_SKILLS_ZIP,
+    PROTOCOL_VERSION, REMOTE_DB_SQL, REMOTE_MANIFEST,
 };
 
 #[cfg(test)]
@@ -34,7 +34,7 @@ pub async fn check_connection(settings: &S3SyncSettings) -> Result<(), AppError>
     s3::test_connection(&creds).await
 }
 
-/// Upload local snapshot (db + skills) to remote S3.
+/// Upload local snapshot (db) to remote S3.
 pub async fn upload(
     db: &crate::database::Database,
     settings: &mut S3SyncSettings,
@@ -47,9 +47,6 @@ pub async fn upload(
     // Upload order: artifacts first, manifest last (best-effort consistency)
     let db_key = s3_key(settings, REMOTE_DB_SQL);
     s3::put_object(&creds, &db_key, snapshot.db_sql, "application/sql").await?;
-
-    let skills_key = s3_key(settings, REMOTE_SKILLS_ZIP);
-    s3::put_object(&creds, &skills_key, snapshot.skills_zip, "application/zip").await?;
 
     let manifest_key = s3_key(settings, REMOTE_MANIFEST);
     s3::put_object(
@@ -78,7 +75,7 @@ pub async fn upload(
     Ok(serde_json::json!({ "status": "uploaded" }))
 }
 
-/// Download remote snapshot and apply to local database + skills.
+/// Download remote snapshot and apply to local database.
 pub async fn download(
     db: &crate::database::Database,
     settings: &mut S3SyncSettings,
@@ -107,11 +104,9 @@ pub async fn download(
 
     // Download and verify artifacts
     let db_sql = download_and_verify(settings, &creds, REMOTE_DB_SQL, &manifest.artifacts).await?;
-    let skills_zip =
-        download_and_verify(settings, &creds, REMOTE_SKILLS_ZIP, &manifest.artifacts).await?;
 
     // Apply snapshot
-    apply_snapshot(db, &db_sql, &skills_zip)?;
+    apply_snapshot(db, &db_sql)?;
 
     let manifest_hash = sha256_hex(&manifest_bytes);
     let _persisted =
@@ -267,7 +262,7 @@ mod tests {
     #[test]
     fn s3_key_matches_expected_pattern() {
         let settings = test_settings();
-        let key = s3_key(&settings, "skills.zip");
+        let key = s3_key(&settings, "db.sql");
         // Should follow {remote_root}/v{version}/db-v{db}/{profile}/{artifact}
         let parts: Vec<&str> = key.splitn(5, '/').collect();
         assert_eq!(parts.len(), 5);
@@ -275,7 +270,7 @@ mod tests {
         assert_eq!(parts[1], "v2");
         assert_eq!(parts[2], "db-v6");
         assert_eq!(parts[3], "default");
-        assert_eq!(parts[4], "skills.zip");
+        assert_eq!(parts[4], "db.sql");
     }
 
     #[test]

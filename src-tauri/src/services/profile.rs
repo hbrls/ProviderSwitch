@@ -20,7 +20,7 @@ use serde::{Deserialize, Serialize};
 use crate::app_config::AppType;
 use crate::database::Profile;
 use crate::error::AppError;
-use crate::services::{McpService, PromptService, ProviderService, SkillService};
+use crate::services::{McpService, PromptService, ProviderService};
 use crate::store::AppState;
 
 /// Profile 操作的应用分组：项目实体全应用共享，但快照/应用/当前指针按组进行。
@@ -126,8 +126,6 @@ pub struct ProfilePayload {
     pub providers: PerApp<Option<String>>,
     /// 每 app 启用的 MCP server id 集合
     pub mcp: PerApp<Option<Vec<String>>>,
-    /// 每 app 启用的 Skill id 集合
-    pub skills: PerApp<Option<Vec<String>>>,
     /// 每 app 激活的 prompt id
     pub prompts: PerApp<Option<String>>,
 }
@@ -145,9 +143,6 @@ impl ProfilePayload {
             if let (Some(dst), Some(src)) = (self.mcp.get_mut(app), other.mcp.get(app)) {
                 *dst = src.clone();
             }
-            if let (Some(dst), Some(src)) = (self.skills.get_mut(app), other.skills.get(app)) {
-                *dst = src.clone();
-            }
             if let (Some(dst), Some(src)) = (self.prompts.get_mut(app), other.prompts.get(app)) {
                 *dst = src.clone();
             }
@@ -159,7 +154,6 @@ impl ProfilePayload {
         scope.apps().iter().any(|app| {
             self.providers.get(app).is_some_and(|s| s.is_some())
                 || self.mcp.get(app).is_some_and(|s| s.is_some())
-                || self.skills.get(app).is_some_and(|s| s.is_some())
                 || self.prompts.get(app).is_some_and(|s| s.is_some())
         })
     }
@@ -200,7 +194,6 @@ impl ProfileService {
     ) -> Result<ProfilePayload, AppError> {
         let mut payload = ProfilePayload::default();
         let mcp_servers = state.db.get_all_mcp_servers()?;
-        let skills = state.db.get_all_installed_skills()?;
 
         for app in scope.apps().iter() {
             if let Some(slot) = payload.providers.get_mut(app) {
@@ -214,15 +207,6 @@ impl ProfileService {
             if let Some(slot) = payload.mcp.get_mut(app) {
                 *slot = Some(
                     mcp_servers
-                        .values()
-                        .filter(|s| s.apps.is_enabled_for(app))
-                        .map(|s| s.id.clone())
-                        .collect(),
-                );
-            }
-            if let Some(slot) = payload.skills.get_mut(app) {
-                *slot = Some(
-                    skills
                         .values()
                         .filter(|s| s.apps.is_enabled_for(app))
                         .map(|s| s.id.clone())
@@ -410,28 +394,6 @@ impl ProfileService {
                 }
             }
 
-            // 3. Skills diff（SkillService 返回 anyhow::Result，收进 warning）
-            if let Some(Some(target_ids)) = payload.skills.get(app) {
-                let skills = state.db.get_all_installed_skills()?;
-                let current: Vec<(String, bool)> = skills
-                    .values()
-                    .map(|s| (s.id.clone(), s.apps.is_enabled_for(app)))
-                    .collect();
-                let (toggles, dangling) = plan_toggles(&current, target_ids);
-                for id in dangling {
-                    warnings.push(format!(
-                        "[{app_str}] skill '{id}' no longer exists, skipped"
-                    ));
-                }
-                for (id, enabled) in toggles {
-                    if let Err(e) = SkillService::toggle_app(&state.db, &id, app, enabled) {
-                        warnings.push(format!(
-                            "[{app_str}] toggle skill '{id}' -> {enabled} failed: {e}"
-                        ));
-                    }
-                }
-            }
-
             // 4. Prompt（None = 不动；已激活则幂等跳过，避免无谓的文件写与备份）
             if let Some(Some(target_prompt)) = payload.prompts.get(app) {
                 let prompts = state.db.get_prompts(app_str)?;
@@ -481,11 +443,6 @@ mod tests {
                 claude: Some(ids(&["m1", "m2"])),
                 claude_desktop: Some(vec![]),
                 codex: None,
-            },
-            skills: PerApp {
-                claude: Some(vec![]),
-                claude_desktop: Some(vec![]),
-                codex: Some(ids(&["s1"])),
             },
             prompts: PerApp {
                 claude: None,
