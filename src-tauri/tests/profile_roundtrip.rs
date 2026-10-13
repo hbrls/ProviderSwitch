@@ -7,8 +7,8 @@ use std::fs;
 use serde_json::json;
 
 use cc_switch_lib::{
-    AppType, InstalledSkill, McpServer, McpService, ProfilePayload, ProfileScope, ProfileService,
-    Prompt, PromptService, Provider, ProviderService, SkillApps, SkillService,
+    AppType, McpServer, McpService, ProfilePayload, ProfileScope, ProfileService, Provider,
+    ProviderService,
 };
 
 #[path = "support.rs"]
@@ -54,50 +54,6 @@ fn mcp_server(id: &str, claude_enabled: bool) -> McpServer {
     .expect("construct mcp server")
 }
 
-fn prompt(id: &str, enabled: bool) -> Prompt {
-    Prompt {
-        id: id.to_string(),
-        name: id.to_uppercase(),
-        content: format!("# prompt {id}\n"),
-        description: None,
-        enabled,
-        created_at: Some(1_000),
-        updated_at: Some(1_000),
-    }
-}
-
-fn installed_skill(id: &str, directory: &str, claude_enabled: bool) -> InstalledSkill {
-    InstalledSkill {
-        id: id.to_string(),
-        name: id.to_string(),
-        description: None,
-        directory: directory.to_string(),
-        repo_owner: None,
-        repo_name: None,
-        repo_branch: None,
-        readme_url: None,
-        apps: SkillApps {
-            claude: claude_enabled,
-            ..Default::default()
-        },
-        installed_at: 1_000,
-        content_hash: None,
-        updated_at: 0,
-    }
-}
-
-fn write_ssot_skill(directory: &str) {
-    let dir = SkillService::get_ssot_dir()
-        .expect("resolve skills SSOT dir")
-        .join(directory);
-    fs::create_dir_all(&dir).expect("create skill dir");
-    fs::write(
-        dir.join("SKILL.md"),
-        format!("---\nname: {directory}\ndescription: Test skill\n---\n"),
-    )
-    .expect("write SKILL.md");
-}
-
 #[test]
 fn profile_snapshot_apply_roundtrip_restores_configuration() {
     let _guard = test_mutex().lock().unwrap_or_else(|e| e.into_inner());
@@ -106,7 +62,7 @@ fn profile_snapshot_apply_roundtrip_restores_configuration() {
 
     let state = create_test_state().expect("create test state");
 
-    // ---- 种子数据：2 个 Claude 供应商（p1 为当前）+ 2 个 MCP + 1 个 Skill + 2 个 Prompt ----
+    // ---- 种子数据：2 个 Claude 供应商（p1 为当前）+ 2 个 MCP ----
     state
         .db
         .save_provider(AppType::Claude.as_str(), &claude_provider("p1", "key-1"))
@@ -120,7 +76,7 @@ fn profile_snapshot_apply_roundtrip_restores_configuration() {
         .set_current_provider(AppType::Claude.as_str(), "p1")
         .expect("set current provider p1");
 
-    // Claude Desktop 只有供应商一个活跃维度（MCP/Skills/Prompt 对它不适用）
+    // Claude Desktop 只有供应商一个活跃维度（MCP 对它不适用）
     state
         .db
         .save_provider(
@@ -159,21 +115,6 @@ fn profile_snapshot_apply_roundtrip_restores_configuration() {
         .save_mcp_server(&mcp_server("m2", false))
         .expect("save mcp m2");
 
-    write_ssot_skill("test-skill");
-    state
-        .db
-        .save_skill(&installed_skill("local:test-skill", "test-skill", true))
-        .expect("save skill");
-
-    state
-        .db
-        .save_prompt(AppType::Claude.as_str(), &prompt("pr1", true))
-        .expect("save prompt pr1");
-    state
-        .db
-        .save_prompt(AppType::Claude.as_str(), &prompt("pr2", false))
-        .expect("save prompt pr2");
-
     // ---- 保存项目 A（在 Claude 页新建：只拍 Claude 当前状态）----
     let profile_a = ProfileService::create(&state, "Project A", ProfileScope::Claude)
         .expect("create profile A");
@@ -181,11 +122,6 @@ fn profile_snapshot_apply_roundtrip_restores_configuration() {
         serde_json::from_str(&profile_a.payload).expect("parse profile A payload");
     assert_eq!(payload.providers.claude.as_deref(), Some("p1"));
     assert_eq!(payload.mcp.claude, Some(vec!["m1".to_string()]));
-    assert_eq!(
-        payload.skills.claude,
-        Some(vec!["local:test-skill".to_string()])
-    );
-    assert_eq!(payload.prompts.claude.as_deref(), Some("pr1"));
     assert_eq!(
         payload.providers.codex, None,
         "codex side not captured when creating from the claude group"
@@ -196,16 +132,13 @@ fn profile_snapshot_apply_roundtrip_restores_configuration() {
         "claude desktop has its own profile scope"
     );
 
-    // ---- 改动全部四类配置（走真实切换路径）----
+    // ---- 改动全部配置（走真实切换路径）----
     ProviderService::switch(&state, AppType::Claude, "p2").expect("switch to p2");
     // Desktop 现在有自己的项目分组；Claude 分组 apply 不应再影响 Desktop
     #[cfg(any(target_os = "macos", windows))]
     ProviderService::switch(&state, AppType::ClaudeDesktop, "d2").expect("switch desktop to d2");
     McpService::toggle_app(&state, "m1", AppType::Claude, false).expect("disable m1");
     McpService::toggle_app(&state, "m2", AppType::Claude, true).expect("enable m2");
-    SkillService::toggle_app(&state.db, "local:test-skill", &AppType::Claude, false)
-        .expect("disable skill");
-    PromptService::enable_prompt(&state, AppType::Claude, "pr2").expect("enable pr2");
 
     // ---- 应用项目 A（Claude 组）：只复原 Claude 侧 ----
     let warnings = ProfileService::apply(&state, &profile_a.id, ProfileScope::Claude)
@@ -238,26 +171,6 @@ fn profile_snapshot_apply_roundtrip_restores_configuration() {
     let servers = state.db.get_all_mcp_servers().expect("get mcp servers");
     assert!(servers.get("m1").expect("m1").apps.claude, "m1 re-enabled");
     assert!(!servers.get("m2").expect("m2").apps.claude, "m2 disabled");
-
-    let skills = state.db.get_all_installed_skills().expect("get skills");
-    assert!(
-        skills.get("local:test-skill").expect("skill").apps.claude,
-        "skill re-enabled"
-    );
-
-    let prompts = state
-        .db
-        .get_prompts(AppType::Claude.as_str())
-        .expect("get prompts");
-    assert!(prompts.get("pr1").expect("pr1").enabled, "pr1 re-enabled");
-    assert!(!prompts.get("pr2").expect("pr2").enabled, "pr2 disabled");
-
-    let live_prompt = fs::read_to_string(claude_dir.join("CLAUDE.md")).expect("read CLAUDE.md");
-    assert_eq!(
-        live_prompt,
-        prompt("pr1", true).content,
-        "live memory file restored"
-    );
 
     assert_eq!(
         state
@@ -408,9 +321,7 @@ fn profile_apply_reports_dangling_references_and_continues() {
     // 手工构造引用了不存在资源的 payload
     let payload = json!({
         "providers": { "claude": "ghost-provider" },
-        "mcp": { "claude": ["m1", "ghost-mcp"] },
-        "skills": { "claude": ["ghost-skill"] },
-        "prompts": { "claude": "ghost-prompt" }
+        "mcp": { "claude": ["m1", "ghost-mcp"] }
     });
     let profile = cc_switch_lib::Profile {
         id: "dangling-test".to_string(),
@@ -426,7 +337,7 @@ fn profile_apply_reports_dangling_references_and_continues() {
         .expect("apply succeeds");
     assert_eq!(
         warnings.len(),
-        4,
+        2,
         "each dangling reference yields one warning: {warnings:?}"
     );
 
@@ -495,7 +406,7 @@ fn switching_profile_autosaves_previous_profile_state() {
 
     let state = create_test_state().expect("create test state");
 
-    // ---- 种子：Claude 侧两套供应商 / MCP / Prompt ----
+    // ---- 种子：Claude 侧两套供应商 / MCP ----
     state
         .db
         .save_provider(AppType::Claude.as_str(), &claude_provider("p1", "key-1"))
@@ -527,27 +438,17 @@ fn switching_profile_autosaves_previous_profile_state() {
         .save_mcp_server(&mcp_server("m2", false))
         .expect("save mcp m2");
 
-    state
-        .db
-        .save_prompt(AppType::Claude.as_str(), &prompt("pr1", true))
-        .expect("save prompt pr1");
-    state
-        .db
-        .save_prompt(AppType::Claude.as_str(), &prompt("pr2", false))
-        .expect("save prompt pr2");
-
-    // ---- Project A：状态 X（p1 / m1 / pr1）----
+    // ---- Project A：状态 X（p1 / m1）----
     let project_a = ProfileService::create(&state, "Project A", ProfileScope::Claude)
         .expect("create project A");
     let warnings = ProfileService::apply(&state, &project_a.id, ProfileScope::Claude)
         .expect("apply project A");
     assert!(warnings.is_empty(), "unexpected warnings: {warnings:?}");
 
-    // ---- 在 A 下改到状态 Y（p2 / m2 / pr2），然后据此创建 Project B ----
+    // ---- 在 A 下改到状态 Y（p2 / m2），然后据此创建 Project B ----
     ProviderService::switch(&state, AppType::Claude, "p2").expect("switch to p2");
     McpService::toggle_app(&state, "m1", AppType::Claude, false).expect("disable m1");
     McpService::toggle_app(&state, "m2", AppType::Claude, true).expect("enable m2");
-    PromptService::enable_prompt(&state, AppType::Claude, "pr2").expect("enable pr2");
 
     let project_b = ProfileService::create(&state, "Project B", ProfileScope::Claude)
         .expect("create project B");
@@ -569,12 +470,6 @@ fn switching_profile_autosaves_previous_profile_state() {
     let servers = state.db.get_all_mcp_servers().expect("get mcp servers");
     assert!(!servers.get("m1").expect("m1").apps.claude, "m1 disabled");
     assert!(servers.get("m2").expect("m2").apps.claude, "m2 enabled");
-    let prompts = state
-        .db
-        .get_prompts(AppType::Claude.as_str())
-        .expect("get prompts");
-    assert!(!prompts.get("pr1").expect("pr1").enabled, "pr1 disabled");
-    assert!(prompts.get("pr2").expect("pr2").enabled, "pr2 enabled");
 
     // Project A 被自动保存为离开时的状态 Y
     let saved_a = state
@@ -586,13 +481,11 @@ fn switching_profile_autosaves_previous_profile_state() {
         serde_json::from_str(&saved_a.payload).expect("parse project A payload");
     assert_eq!(payload_a.providers.claude.as_deref(), Some("p2"));
     assert_eq!(payload_a.mcp.claude, Some(vec!["m2".to_string()]));
-    assert_eq!(payload_a.prompts.claude.as_deref(), Some("pr2"));
 
     // ---- 在 B 下改回状态 X，再切换回 A ----
     ProviderService::switch(&state, AppType::Claude, "p1").expect("switch to p1");
     McpService::toggle_app(&state, "m1", AppType::Claude, true).expect("enable m1");
     McpService::toggle_app(&state, "m2", AppType::Claude, false).expect("disable m2");
-    PromptService::enable_prompt(&state, AppType::Claude, "pr1").expect("enable pr1");
 
     let warnings = ProfileService::apply(&state, &project_a.id, ProfileScope::Claude)
         .expect("switch back to project A");
@@ -617,18 +510,6 @@ fn switching_profile_autosaves_previous_profile_state() {
         servers.get("m2").expect("m2").apps.claude,
         "m2 stays enabled"
     );
-    let prompts = state
-        .db
-        .get_prompts(AppType::Claude.as_str())
-        .expect("get prompts");
-    assert!(
-        !prompts.get("pr1").expect("pr1").enabled,
-        "pr1 stays disabled"
-    );
-    assert!(
-        prompts.get("pr2").expect("pr2").enabled,
-        "pr2 stays enabled"
-    );
 
     // Project B 被自动保存为离开时的状态 X
     let saved_b = state
@@ -640,7 +521,6 @@ fn switching_profile_autosaves_previous_profile_state() {
         serde_json::from_str(&saved_b.payload).expect("parse project B payload");
     assert_eq!(payload_b.providers.claude.as_deref(), Some("p1"));
     assert_eq!(payload_b.mcp.claude, Some(vec!["m1".to_string()]));
-    assert_eq!(payload_b.prompts.claude.as_deref(), Some("pr1"));
 }
 
 #[test]
