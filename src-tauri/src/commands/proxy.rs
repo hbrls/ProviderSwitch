@@ -33,6 +33,7 @@ pub async fn stop_proxy_server(state: tauri::State<'_, AppState>) -> Result<(), 
         || takeover.codex
         || takeover.gemini
         || takeover.grokbuild
+        || takeover.kilo
         || takeover.opencode
         || takeover.openclaw
     {

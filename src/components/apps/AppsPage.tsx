@@ -391,6 +391,11 @@ export function AppsPage() {
                 />
               ),
             )}
+            <AppRow
+              app="kilo"
+              name={APP_DISPLAY_NAME.kilo}
+              visibility={visibilitySwitch("kilo")}
+            />
           </div>
         </div>
       </div>
