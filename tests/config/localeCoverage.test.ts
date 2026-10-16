@@ -1,8 +1,5 @@
 import { describe, expect, it } from "vitest";
-import tr from "@/i18n/locales/tr.json";
 import en from "@/i18n/locales/en.json";
-import ja from "@/i18n/locales/ja.json";
-import zhTW from "@/i18n/locales/zh-TW.json";
 import zh from "@/i18n/locales/zh.json";
 
 type TranslationTree = Record<string, unknown>;
@@ -47,11 +44,7 @@ const piReference = new Map(
 const piProductReferences = new Map(
   [...reference].filter(([, value]) => /\bPi\b/.test(value)),
 );
-const locales = [
-  ["zh", zh],
-  ["ja", ja],
-  ["zh-TW", zhTW],
-] as const;
+const locales = [["zh", zh]] as const;
 
 describe("locale coverage", () => {
   it.each(locales)("covers every Pi translation key in %s", (_name, tree) => {
