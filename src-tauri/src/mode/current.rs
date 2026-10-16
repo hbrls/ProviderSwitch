@@ -105,6 +105,10 @@ pub fn local_direct_pointer(app: &AppType) -> Option<String> {
     crate::settings::get_current_provider(app)
 }
 
+pub fn database_direct_pointer(db: &Database, app: &AppType) -> Result<Option<String>, AppError> {
+    db.get_current_provider(app.as_str())
+}
+
 /// 删除前检查：本地记录、DB 的 `is_current`、代理路由里任何一处指着它，就算正在用。
 pub fn is_referenced(db: &Database, app: &AppType, id: &str) -> Result<bool, AppError> {
     if crate::settings::get_current_provider(app).as_deref() == Some(id)

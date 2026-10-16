@@ -44,11 +44,12 @@ use super::stack::{self, StackModel, StackView};
 use super::state::{op, Contract, Mode, ModeState, PendingTarget, StackState};
 
 /// 支持代理模式的应用。
-pub const PROXY_APPS: [AppType; 4] = [
+pub const PROXY_APPS: [AppType; 5] = [
     AppType::Claude,
     AppType::Codex,
     AppType::Gemini,
     AppType::GrokBuild,
+    AppType::Kilo,
 ];
 
 fn err(error: impl std::fmt::Display) -> String {
@@ -100,14 +101,9 @@ enum LiveNow {
 impl LiveNow {
     fn of(state: &AppState, app: &AppType, mode: &ModeState) -> Result<Self, String> {
         if mode.attached {
-            // 旧版接管留下的状态没有路由记录，那时路由就是直连指针。
-            let route = match route_provider(state, app, mode)? {
-                Some(route) => Some(route),
-                None => direct_provider(state, app)?,
-            };
             Ok(Self::Proxy {
                 contract: mode.contract.clone(),
-                route,
+                route: route_provider(state, app, mode)?,
             })
         } else {
             Ok(Self::Direct(direct_provider(state, app)?))
@@ -485,6 +481,11 @@ async fn write_proxy(
             .map_err(err)?;
             unchanged
         }
+        AppType::Kilo => {
+            commit_state(state, app, &PendingTarget::mode(target))?;
+            // Kilo 只提交路由状态，不重写客户端配置。
+            true
+        }
         _ => return Err(format!("{} 不支持本地路由", app.as_str())),
     };
     Ok(!unchanged)
@@ -574,6 +575,7 @@ fn write_direct(
             )
             .map_err(err)?;
         }
+        AppType::Kilo => commit_state(state, app, &pending_target)?,
         _ => return Err(format!("{} 不支持本地路由", app.as_str())),
     }
     Ok(())
@@ -735,7 +737,7 @@ async fn enter_locked(
     stack_mode: Option<bool>,
     explicit_route: Option<Provider>,
 ) -> Result<(), String> {
-    if !state.proxy_service.is_running().await {
+    if !matches!(app, AppType::Kilo) && !state.proxy_service.is_running().await {
         state.proxy_service.start().await?;
     }
     let mode = current::mode_state(app);
@@ -753,6 +755,12 @@ async fn enter_locked(
             )
         })?,
     };
+    if matches!(app, AppType::Kilo) {
+        crate::proxy::kilo::parse_provider(&route).map_err(err)?;
+        if !state.proxy_service.is_running().await {
+            state.proxy_service.start().await?;
+        }
+    }
     let next_stack = match stack_mode {
         Some(on) => {
             let current = settled_stack(app)?;
@@ -817,6 +825,7 @@ pub async fn exit(state: &AppState, app: &AppType) -> Result<(), String> {
     {
         let _guard = lock_settled(state, app).await.map_err(|e| e.to_string())?;
         exit_locked(state, app, false)?;
+        state.proxy_service.clear_active_target(app).await;
     }
     if let Err(error) = state.db.clear_provider_health_for_app(app.as_str()).await {
         log::warn!("清除 {} 健康状态失败: {error}", app.as_str());
@@ -960,6 +969,8 @@ pub async fn exit_all(state: &AppState) -> Result<(), String> {
         };
         if let Err(error) = result {
             errors.push(format!("{}: {error}", app.as_str()));
+        } else {
+            state.proxy_service.clear_active_target(&app).await;
         }
     }
     if state.proxy_service.is_running().await {
@@ -987,6 +998,8 @@ pub async fn detach_all(state: &AppState) {
         };
         if let Err(error) = result {
             log::error!("退出时把 {} 指回直连失败: {error}", app.as_str());
+        } else {
+            state.proxy_service.clear_active_target(&app).await;
         }
     }
     if state.proxy_service.is_running().await {
@@ -1005,6 +1018,9 @@ pub async fn switch_route_locked(
     let mode = current::mode_state(app);
     if !mode.is_proxy() {
         return Err(format!("{} 不在代理模式", app.as_str()));
+    }
+    if matches!(app, AppType::Kilo) {
+        crate::proxy::kilo::parse_provider(target).map_err(err)?;
     }
     let new_state = ModeState {
         proxy_route: Some(target.id.clone()),
@@ -1577,18 +1593,7 @@ pub async fn record_failover_route(
     Ok(true)
 }
 
-/// 启动时：先按旧版遗留的接管状态定下每个应用的模式（首次运行新版、降级后再升级），
-/// 再把代理模式的应用接上。要在补完上次未完成的写入之后、自动提取通用配置片段之后。
-///
-/// | `proxy_config.enabled` | 备份行或占位符 | 处理 |
-/// |---|---|---|
-/// | 1 | 无 | 代理模式，接上 |
-/// | 1 | 有 | 不回放备份，直接写代理契约；备份行转存到本机文件后删除 |
-/// | 0 | 有 | 写回直连投影 |
-/// | 0 | 无 | 直连 |
-///
-/// 有遗留物时以 `enabled` 为准（旧版是最后一个写入者）；没有时以 `live-state.json`
-/// 为准，它还没有值就按 `enabled` 定。
+/// 启动时按设备本地 JSON 模式接上代理，在恢复未完成写入和提取通用配置之后执行。
 pub async fn startup(state: &AppState) {
     for app in PROXY_APPS {
         let result = match lock_settled(state, &app).await {
@@ -1607,6 +1612,12 @@ pub async fn startup(state: &AppState) {
 }
 
 async fn startup_app(state: &AppState, app: &AppType) -> Result<(), String> {
+    if matches!(app, AppType::Kilo) {
+        if current::is_proxy(app) {
+            return enter_locked(state, app, op::ATTACH, None, None).await;
+        }
+        return Ok(());
+    }
     let had_backup = drain_legacy_backup(state, app).await;
     let mut mode = current::mode_state(app);
     // 新版自己接上时写的占位符不算遗留物（比如重启更新时没来得及分离）。
@@ -1653,12 +1664,6 @@ async fn startup_app(state: &AppState, app: &AppType) -> Result<(), String> {
     }
 
     if mode.attached || mode.mode != Some(Mode::Direct) {
-        if placeholder {
-            log::warn!(
-                "{} 的客户端配置里有旧版接管留下的代理占位符，已写回直连配置",
-                app.as_str()
-            );
-        }
         let live_now = if mode.attached {
             LiveNow::Proxy {
                 contract: mode.contract.clone(),
@@ -1803,7 +1808,7 @@ mod tests {
     //! 代理契约里的凭据和模型别名（从旧的接管字段测试迁过来：#3784、#4919、#1049）。
     use super::*;
     use crate::provider::ProviderMeta;
-    use serde_json::Map;
+    use serde_json::{Map, Value};
     use std::path::Path;
 
     fn assert_env_str(env: &Map<String, Value>, key: &str, expected: Option<&str>) {
@@ -2383,8 +2388,7 @@ mod tests {
 #[cfg(test)]
 mod mode_tests {
     //! 双模式的验收：进入 / 退出只动关键字段和独有字段；契约相同的换路由不碰客户端文件；
-    //! 代理路由和直连指针互相独立；每一步崩溃都能按 pending 补完；旧版遗留的接管状态
-    //! 在启动时迁移掉。
+    //! 代理路由和直连指针互相独立；每一步崩溃都能按 pending 补完；启动只读 JSON 模式。
     use super::*;
     use crate::database::Database;
     use crate::live::engine::DeviceStore;
@@ -2401,7 +2405,7 @@ mod mode_tests {
     use tempfile::TempDir;
 
     struct Home {
-        dir: TempDir,
+        _dir: TempDir,
         saved: Vec<(&'static str, Option<OsString>)>,
     }
 
@@ -2417,7 +2421,7 @@ mod mode_tests {
                 })
                 .collect();
             crate::settings::reload_settings().expect("reload settings");
-            Self { dir, saved }
+            Self { _dir: dir, saved }
         }
     }
 
@@ -2450,6 +2454,241 @@ mod mode_tests {
             json!({ "env": env }),
             None,
         )
+    }
+
+    fn kilo(id: &str) -> Provider {
+        Provider::with_id(
+            id.into(),
+            id.into(),
+            json!({"models": {"model": {"name": "Model"}},
+                "thinking": {"type": "enabled"},
+                "reasoning_effort": "high",
+                "options": {"baseURL": "https://example.test/v1", "apiKey": "secret"}}),
+            None,
+        )
+    }
+
+    fn set_proxy_mode(app: &AppType, route: &str) {
+        state::update(&DeviceStore::for_device(), |live| {
+            live.apps
+                .entry(app.as_str().into())
+                .or_default()
+                .set_mode_state(ModeState {
+                    mode: Some(Mode::Proxy),
+                    proxy_route: Some(route.into()),
+                    ..ModeState::default()
+                });
+        })
+        .unwrap();
+    }
+
+    #[tokio::test]
+    #[serial]
+    async fn kilo_startup_restores_json_mode_and_target() {
+        let _home = Home::new();
+        let state = state_with(AppType::Kilo, &[kilo("a"), kilo("b")], "a").await;
+        set_proxy_mode(&AppType::Kilo, "b");
+        startup(&state).await;
+        assert!(state.proxy_service.is_running().await);
+        assert!(
+            state
+                .proxy_service
+                .get_takeover_status()
+                .await
+                .unwrap()
+                .kilo
+        );
+        assert!(mode(&AppType::Kilo).attached);
+        let targets = state
+            .proxy_service
+            .get_status()
+            .await
+            .unwrap()
+            .active_targets;
+        assert!(targets
+            .iter()
+            .any(|t| t.app_type == "kilo" && t.provider_id == "b"));
+        assert_eq!(direct(&state, &AppType::Kilo).as_deref(), Some("a"));
+
+        // A second startup also restores an already attached channel after a crash.
+        state.proxy_service.stop().await.unwrap();
+        let restarted = AppState::new(state.db.clone());
+        startup(&restarted).await;
+        assert!(restarted.proxy_service.is_running().await);
+        assert!(restarted
+            .proxy_service
+            .get_status()
+            .await
+            .unwrap()
+            .active_targets
+            .iter()
+            .any(|t| t.app_type == "kilo" && t.provider_id == "b"));
+        exit_all(&restarted).await.unwrap();
+        assert_eq!(mode(&AppType::Kilo).mode, Some(Mode::Direct));
+        assert!(!mode(&AppType::Kilo).attached);
+        assert!(
+            !restarted
+                .proxy_service
+                .get_takeover_status()
+                .await
+                .unwrap()
+                .kilo
+        );
+        assert!(!restarted.proxy_service.is_running().await);
+    }
+
+    #[tokio::test]
+    #[serial]
+    async fn kilo_detach_preserves_json_mode_for_restart() {
+        let _home = Home::new();
+        let state = state_with(AppType::Kilo, &[kilo("a")], "a").await;
+        enter(&state, &AppType::Kilo, false).await.unwrap();
+        detach_all(&state).await;
+        assert!(mode(&AppType::Kilo).is_proxy());
+        assert!(!mode(&AppType::Kilo).attached);
+        assert_eq!(mode(&AppType::Kilo).proxy_route.as_deref(), Some("a"));
+        assert!(!state.proxy_service.is_running().await);
+        let restarted = AppState::new(state.db.clone());
+        startup(&restarted).await;
+        assert!(mode(&AppType::Kilo).attached);
+        assert!(restarted.proxy_service.is_running().await);
+        exit_all(&restarted).await.unwrap();
+    }
+
+    #[tokio::test]
+    #[serial]
+    async fn kilo_requests_use_the_json_route_after_startup() {
+        let _home = Home::new();
+        let (sent, mut received) = tokio::sync::mpsc::channel(1);
+        let upstream = axum::Router::new().route(
+            "/v1/chat/completions",
+            axum::routing::post(move |axum::Json(body): axum::Json<Value>| {
+                let sent = sent.clone();
+                async move {
+                    sent.send(body).await.unwrap();
+                    (
+                        [("content-type", "text/event-stream")],
+                        "data: {\"id\":\"test\",\"choices\":[{\"delta\":{\"content\":\"ok\"},\"finish_reason\":null}]}\n\ndata: [DONE]\n\n",
+                    )
+                }
+            }),
+        );
+        let listener = tokio::net::TcpListener::bind(("127.0.0.1", 0))
+            .await
+            .unwrap();
+        let address = listener.local_addr().unwrap();
+        let upstream_task = tokio::spawn(async move {
+            axum::serve(listener, upstream).await.unwrap();
+        });
+        let mut route = kilo("b");
+        route.settings_config["options"]["baseURL"] = json!(format!("http://{address}/v1"));
+        let state = state_with(AppType::Kilo, &[kilo("a"), route], "a").await;
+        set_proxy_mode(&AppType::Kilo, "b");
+        startup(&state).await;
+        let status = state.proxy_service.get_status().await.unwrap();
+        let response = reqwest::Client::builder().no_proxy()
+            .timeout(std::time::Duration::from_secs(5)).build().unwrap()
+            .post(format!("http://127.0.0.1:{}/kilo/v1/chat/completions", status.port))
+            .json(&json!({"model": "client-model", "messages": [{"role": "user", "content": "test"}]}))
+            .send().await.unwrap();
+        assert!(response.status().is_success());
+        assert!(response.text().await.unwrap().contains("ok"));
+        let body = received.try_recv().unwrap();
+        assert_eq!(body["model"], "model");
+        assert_eq!(direct(&state, &AppType::Kilo).as_deref(), Some("a"));
+        exit_all(&state).await.unwrap();
+        upstream_task.abort();
+    }
+
+    #[tokio::test]
+    #[serial]
+    async fn leaving_another_app_keeps_kilo_running_and_clears_its_target() {
+        let _home = Home::new();
+        seed_settings(USER_SETTINGS);
+        let state = state_with(
+            AppType::Claude,
+            &[claude("a", "https://a.example", json!({}))],
+            "a",
+        )
+        .await;
+        state.db.save_provider("kilo", &kilo("k")).unwrap();
+        state.db.set_current_provider("kilo", "k").unwrap();
+        enter(&state, &AppType::Claude, false).await.unwrap();
+        enter(&state, &AppType::Kilo, false).await.unwrap();
+        exit(&state, &AppType::Claude).await.unwrap();
+        assert!(state.proxy_service.is_running().await);
+        let targets = state
+            .proxy_service
+            .get_status()
+            .await
+            .unwrap()
+            .active_targets;
+        assert!(targets.iter().any(|t| t.app_type == "kilo"));
+        assert!(!targets.iter().any(|t| t.app_type == "claude"));
+        exit(&state, &AppType::Kilo).await.unwrap();
+        assert!(!state.proxy_service.is_running().await);
+    }
+
+    #[tokio::test]
+    #[serial]
+    async fn upstream_startup_preserves_sqlite_flag_recovery() {
+        let _home = Home::new();
+        seed_settings(USER_SETTINGS);
+        let state = state_with(
+            AppType::Claude,
+            &[claude("a", "https://a.example", json!({}))],
+            "a",
+        )
+        .await;
+        state.db.set_proxy_flags_sync("claude", true, true).unwrap();
+        startup(&state).await;
+        assert!(state.proxy_service.is_running().await);
+        assert!(mode(&AppType::Claude).attached);
+        assert_eq!(state.db.get_proxy_flags_sync("claude"), (true, true));
+        exit_all(&state).await.unwrap();
+        assert_eq!(state.db.get_proxy_flags_sync("claude"), (false, true));
+        assert!(!state.proxy_service.is_running().await);
+    }
+
+    #[tokio::test]
+    #[serial]
+    async fn kilo_startup_ignores_sqlite_flags_and_legacy_backup() {
+        let _home = Home::new();
+        let state = state_with(AppType::Kilo, &[kilo("a")], "a").await;
+        state.db.get_proxy_config_for_app("kilo").await.unwrap();
+        state.db.set_proxy_flags_sync("kilo", true, false).unwrap();
+        state
+            .db
+            .save_live_backup("kilo", r#"{"legacy":true}"#)
+            .await
+            .unwrap();
+        startup(&state).await;
+        assert!(!state.proxy_service.is_running().await);
+        assert!(!state.proxy_service.get_takeover_status().await.unwrap().kilo);
+        assert!(state.db.get_live_backup("kilo").await.unwrap().is_some());
+
+        set_proxy_mode(&AppType::Kilo, "a");
+        state.db.set_proxy_flags_sync("kilo", false, false).unwrap();
+        startup(&state).await;
+        assert!(state.proxy_service.is_running().await);
+        assert!(state.proxy_service.get_takeover_status().await.unwrap().kilo);
+        assert!(!state.db.get_proxy_flags_sync("kilo").0);
+        assert!(state.db.get_live_backup("kilo").await.unwrap().is_some());
+        exit_all(&state).await.unwrap();
+    }
+
+    #[tokio::test]
+    #[serial]
+    async fn invalid_kilo_route_at_startup_fails_to_attach() {
+        let _home = Home::new();
+        let mut invalid = kilo("a");
+        invalid.settings_config = json!({});
+        let state = state_with(AppType::Kilo, &[invalid], "a").await;
+        set_proxy_mode(&AppType::Kilo, "a");
+        startup(&state).await;
+        assert_eq!(mode(&AppType::Kilo).mode, Some(Mode::Proxy));
+        assert!(!mode(&AppType::Kilo).attached);
+        assert!(!state.proxy_service.is_running().await);
     }
 
     async fn state_with(app: AppType, rows: &[Provider], current: &str) -> AppState {
@@ -2560,10 +2799,6 @@ mod mode_tests {
         assert!(entered.attached);
         assert_eq!(entered.proxy_route.as_deref(), Some("a"));
         assert!(entered.contract.is_some());
-        assert!(
-            state.db.get_proxy_flags_sync("claude").0,
-            "enabled mirrors the mode"
-        );
 
         exit(&state, &AppType::Claude).await.expect("exit");
         assert_back_to_user_settings();
@@ -2577,7 +2812,6 @@ mod mode_tests {
         let left = mode(&AppType::Claude);
         assert_eq!(left.mode, Some(Mode::Direct));
         assert_eq!(left.proxy_route.as_deref(), Some("a"), "the route is kept");
-        assert!(!state.db.get_proxy_flags_sync("claude").0);
         assert!(!state.proxy_service.is_running().await);
     }
 
@@ -2888,11 +3122,6 @@ mod mode_tests {
             assert_eq!(recovered.is_proxy(), expect_proxy, "{point}");
             assert_eq!(recovered.attached, expect_proxy, "{point}");
             assert_eq!(live_is_proxy, expect_proxy, "{point}: file and state agree");
-            assert_eq!(
-                state.db.get_proxy_flags_sync("claude").0,
-                expect_proxy,
-                "{point}"
-            );
             assert!(state::pending(&DeviceStore::for_device(), "claude")
                 .unwrap()
                 .is_none());
@@ -2927,62 +3156,6 @@ mod mode_tests {
         assert_back_to_user_settings();
         if state.proxy_service.is_running().await {
             state.proxy_service.stop().await.unwrap();
-        }
-    }
-
-    #[tokio::test]
-    #[serial]
-    async fn startup_moves_legacy_takeover_state_over_to_the_modes() {
-        for enabled in [true, false] {
-            let home = Home::new();
-            seed_settings(
-                r#"{"env":{"ANTHROPIC_BASE_URL":"http://127.0.0.1:15721","ANTHROPIC_AUTH_TOKEN":"PROXY_MANAGED"},"hooks":{}}"#,
-            );
-            let state = state_with(
-                AppType::Claude,
-                &[claude("a", "https://a.example", json!({}))],
-                "a",
-            )
-            .await;
-            state
-                .db
-                .save_live_backup(
-                    "claude",
-                    r#"{"env":{"ANTHROPIC_BASE_URL":"https://stale.example"}}"#,
-                )
-                .await
-                .unwrap();
-            state
-                .db
-                .set_proxy_flags_sync("claude", enabled, false)
-                .unwrap();
-
-            startup(&state).await;
-
-            assert!(
-                state.db.get_live_backup("claude").await.unwrap().is_none(),
-                "the old version would replay a leftover backup row after a downgrade"
-            );
-            let drained = home.dir.path().join(".cc-switch/backups/proxy-live-backup");
-            assert_eq!(
-                fs::read_dir(&drained).unwrap().count(),
-                1,
-                "kept aside as a file"
-            );
-            let migrated = mode(&AppType::Claude);
-            let live = settings();
-            assert_eq!(live["hooks"], json!({}));
-            if enabled {
-                assert!(migrated.is_proxy() && migrated.attached);
-                let proxy_url = state.proxy_service.build_proxy_urls().await.unwrap().0;
-                assert_eq!(live["env"]["ANTHROPIC_BASE_URL"], proxy_url.as_str());
-                exit(&state, &AppType::Claude).await.unwrap();
-            } else {
-                assert_eq!(migrated.mode, Some(Mode::Direct));
-                assert_eq!(live["env"]["ANTHROPIC_BASE_URL"], "https://a.example");
-                assert_eq!(live["env"]["ANTHROPIC_AUTH_TOKEN"], "sk-a");
-                assert!(!state.proxy_service.is_running().await);
-            }
         }
     }
 

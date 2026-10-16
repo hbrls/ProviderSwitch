@@ -1031,4 +1031,26 @@ mod tests {
             home.join("pi").join("agent")
         );
     }
+
+    #[test]
+    fn visible_apps_serializes_kilo_field() {
+        let visible = VisibleApps::default();
+        let value = serde_json::to_value(&visible).expect("serialize visible apps");
+        assert_eq!(value.get("kilo"), Some(&serde_json::json!(true)));
+    }
+
+    #[test]
+    fn visible_apps_missing_kilo_defaults_visible() {
+        let visible: VisibleApps = serde_json::from_value(serde_json::json!({
+            "claude": true,
+            "codex": true,
+            "gemini": true,
+            "opencode": true,
+            "openclaw": true,
+            "hermes": true
+        }))
+        .expect("visible apps");
+
+        assert!(visible.kilo);
+    }
 }

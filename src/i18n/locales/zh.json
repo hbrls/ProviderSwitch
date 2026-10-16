@@ -1078,6 +1078,25 @@
       "description": "MiniMax 官方账号登录由 MiniMax Code 自行管理，无需导入；config.yaml 里已有的自定义供应商会自动显示在这里。点击右上角 +，从预设或自定义配置添加供应商。"
     }
   },
+  "kilo": {
+    "form": {
+      "configPreview": "Kilo 配置 JSON",
+      "providerName": "供应商名称",
+      "baseUrl": "Base URL",
+      "apiKey": "API Key",
+      "models": "模型",
+      "modelId": "模型 ID",
+      "modelName": "模型名称",
+      "requestBody": "请求体",
+      "thinkingType": "Thinking 类型",
+      "reasoningEffort": "Reasoning Effort",
+      "extraOptions": "额外选项",
+      "noExtraOptions": "未配置额外选项",
+      "optionKey": "选项键",
+      "optionValue": "选项值",
+      "removeOption": "删除选项"
+    }
+  },
   "pi": {
     "empty": {
       "title": "还没有添加 API Key 供应商",
