@@ -4,7 +4,6 @@
 //! via deep links. Supports importing:
 //! - Provider configurations (Claude/Codex/Gemini)
 //! - MCP server configurations
-//! - Prompts
 //!
 
 mod codex_link;
@@ -12,7 +11,6 @@ mod grok_link;
 mod icon_fetch;
 mod mcp;
 mod parser;
-mod prompt;
 mod provider;
 mod utils;
 
@@ -27,7 +25,6 @@ use std::sync::Mutex;
 pub use icon_fetch::fetch_deeplink_icon;
 pub use mcp::import_mcp_from_deeplink;
 pub use parser::parse_deeplink_url;
-pub use prompt::import_prompt_from_deeplink;
 pub use provider::{import_provider_from_deeplink, parse_and_merge_config};
 
 /// 等前端处理的深链接（解析结果或解析错误）
@@ -89,11 +86,11 @@ pub fn ack_pending_deeplink(id: u64) {
 pub struct DeepLinkImportRequest {
     /// Protocol version (e.g., "v1")
     pub version: String,
-    /// Resource type to import: "provider" | "prompt" | "mcp"
+    /// Resource type to import: "provider" | "mcp"
     pub resource: String,
 
     // ============ Common fields ============
-    /// Target application (claude/codex/gemini) - for provider, prompt
+    /// Target application (claude/codex/gemini) - for provider
     #[serde(skip_serializing_if = "Option::is_none")]
     pub app: Option<String>,
     /// Resource name
@@ -140,14 +137,6 @@ pub struct DeepLinkImportRequest {
     /// 按应用换算成各自的字段（见 `provider::ApiFormat`）。没写时用各应用的默认格式。
     #[serde(skip_serializing_if = "Option::is_none")]
     pub api_format: Option<String>,
-
-    // ============ Prompt-specific fields ============
-    /// Base64 encoded Markdown content
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub content: Option<String>,
-    /// Prompt description
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub description: Option<String>,
 
     // ============ MCP-specific fields ============
     /// Target applications for MCP (comma-separated: "claude,codex,gemini")
