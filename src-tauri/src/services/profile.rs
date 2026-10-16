@@ -1,7 +1,7 @@
 //! 项目 Profile 编排服务
 //!
 //! Profile 是**全应用共享的项目实体**（用户拥有的项目就那几个），payload
-//! 按 app 分槽存配置快照（供应商 / MCP / Skills / Prompt）。快照与应用
+//! 按 app 分槽存配置快照（供应商 / MCP / Skills）。快照与应用
 //! 均**按分组（scope）操作**：Claude Code 与 Codex 的工作目录往往不同
 //! （各在各的项目里），因此各组独立指向自己的当前项目、只拍/只应用组内
 //! 槽位，互不牵连；重命名/删除作用于共享实体本身。
@@ -9,7 +9,6 @@
 //! - 供应商：`ProviderService::switch`（内建代理接管热切换与接管下禁切官方）
 //! - MCP：`McpService::toggle_app`（改标志 + 单 server 物化）
 //! - Skills：`SkillService::toggle_app`（改标志 + 单 skill 物化）
-//! - Prompt：`PromptService::enable_prompt`（互斥激活 + 原子写 live）
 //!
 //! apply 为 best-effort：单项失败收集为 warning 继续，不整体回滚。
 
@@ -20,7 +19,7 @@ use serde::{Deserialize, Serialize};
 use crate::app_config::AppType;
 use crate::database::Profile;
 use crate::error::AppError;
-use crate::services::{McpService, PromptService, ProviderService};
+use crate::services::{McpService, ProviderService};
 use crate::store::AppState;
 
 /// Profile 操作的应用分组：项目实体全应用共享，但快照/应用/当前指针按组进行。
@@ -126,8 +125,6 @@ pub struct ProfilePayload {
     pub providers: PerApp<Option<String>>,
     /// 每 app 启用的 MCP server id 集合
     pub mcp: PerApp<Option<Vec<String>>>,
-    /// 每 app 激活的 prompt id
-    pub prompts: PerApp<Option<String>>,
 }
 
 impl ProfilePayload {
@@ -143,9 +140,6 @@ impl ProfilePayload {
             if let (Some(dst), Some(src)) = (self.mcp.get_mut(app), other.mcp.get(app)) {
                 *dst = src.clone();
             }
-            if let (Some(dst), Some(src)) = (self.prompts.get_mut(app), other.prompts.get(app)) {
-                *dst = src.clone();
-            }
         }
     }
 
@@ -154,7 +148,6 @@ impl ProfilePayload {
         scope.apps().iter().any(|app| {
             self.providers.get(app).is_some_and(|s| s.is_some())
                 || self.mcp.get(app).is_some_and(|s| s.is_some())
-                || self.prompts.get(app).is_some_and(|s| s.is_some())
         })
     }
 }
@@ -212,14 +205,6 @@ impl ProfileService {
                         .map(|s| s.id.clone())
                         .collect(),
                 );
-            }
-            if let Some(slot) = payload.prompts.get_mut(app) {
-                *slot = state
-                    .db
-                    .get_prompts(app.as_str())?
-                    .values()
-                    .find(|p| p.enabled)
-                    .map(|p| p.id.clone());
             }
         }
         Ok(payload)
@@ -394,25 +379,6 @@ impl ProfileService {
                 }
             }
 
-            // 4. Prompt（None = 不动；已激活则幂等跳过，避免无谓的文件写与备份）
-            if let Some(Some(target_prompt)) = payload.prompts.get(app) {
-                let prompts = state.db.get_prompts(app_str)?;
-                match prompts.get(target_prompt) {
-                    None => warnings.push(format!(
-                        "[{app_str}] prompt '{target_prompt}' no longer exists, skipped"
-                    )),
-                    Some(p) if p.enabled => {}
-                    Some(_) => {
-                        if let Err(e) =
-                            PromptService::enable_prompt(state, app.clone(), target_prompt)
-                        {
-                            warnings.push(format!(
-                                "[{app_str}] enable prompt '{target_prompt}' failed: {e}"
-                            ));
-                        }
-                    }
-                }
-            }
         }
 
         state
@@ -444,11 +410,6 @@ mod tests {
                 claude_desktop: Some(vec![]),
                 codex: None,
             },
-            prompts: PerApp {
-                claude: None,
-                claude_desktop: None,
-                codex: Some("pr1".into()),
-            },
         };
         let json = serde_json::to_string(&payload).unwrap();
         // per-app key 必须与 AppType 的 serde 形式一致（claude-desktop 是连字符）
@@ -472,7 +433,6 @@ mod tests {
         assert_eq!(back.mcp.claude, Some(ids(&["m1"])));
         assert_eq!(back.mcp.claude_desktop, None);
         assert_eq!(back.mcp.codex, None, "missing slot means untouched");
-        assert_eq!(back.prompts.codex, None);
 
         let empty: ProfilePayload = serde_json::from_str("{}").unwrap();
         assert_eq!(empty, ProfilePayload::default());
