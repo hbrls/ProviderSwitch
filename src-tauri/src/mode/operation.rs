@@ -406,8 +406,7 @@ pub fn recover_all(
 ///
 /// - 直连指针：设备本地的 `current_provider_*` 和 DB 的 `is_current`，和现有切换用的是
 ///   同一套机制；
-/// - 模式状态：写进 `live-state.json`，另把 `proxy_config.enabled` 镜像成
-///   「mode == proxy」。旧版只认这一列来决定启动时是否接管，降级后才能照常工作。
+/// - 模式状态：只写进设备本地的 `live-state.json`。
 pub fn commit_target(
     db: &crate::database::Database,
     store: &DeviceStore,
@@ -435,7 +434,9 @@ pub fn commit_target(
         })?;
     }
     if let Some(mode) = &target.state {
-        mirror_proxy_flag(db, app, mode.is_proxy())?;
+        if app != "kilo" {
+            mirror_proxy_flag(db, app, mode.is_proxy())?;
+        }
     }
     Ok(())
 }
