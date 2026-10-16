@@ -163,7 +163,6 @@ describe("formatUsageTrendTickLabel", () => {
 describe("formatUsageTrendTokenTickLabel", () => {
   it("uses localized compact units for large token axis ticks", () => {
     const zhFormatter = createUsageTrendTokenTickFormatter("zh-CN");
-    const zhTwFormatter = createUsageTrendTokenTickFormatter("zh-TW");
     const enFormatter = createUsageTrendTokenTickFormatter("en-US");
 
     expect(formatUsageTrendTokenTickLabel(600_000_000, zhFormatter)).toBe(

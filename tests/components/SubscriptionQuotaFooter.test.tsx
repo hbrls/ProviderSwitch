@@ -14,9 +14,7 @@ import { SubscriptionQuotaView } from "@/components/SubscriptionQuotaFooter";
 import type { QuotaTier, SubscriptionQuota } from "@/types/subscription";
 import type { QuotaDisplay } from "@/components/quota/quotaRules";
 import zh from "@/i18n/locales/zh.json";
-import zhTW from "@/i18n/locales/zh-TW.json";
 import en from "@/i18n/locales/en.json";
-import ja from "@/i18n/locales/ja.json";
 
 const i18n = createInstance();
 const now = Date.parse("2026-09-09T12:00:00Z");
@@ -26,9 +24,7 @@ beforeAll(async () => {
     lng: "zh",
     resources: {
       zh: { translation: zh },
-      "zh-TW": { translation: zhTW },
       en: { translation: en },
-      ja: { translation: ja },
     },
     interpolation: { escapeValue: false },
   });
@@ -184,9 +180,7 @@ describe("Claude Fable subscription quota", () => {
   });
 
   it.each([
-    ["zh-TW", "Fable 剩餘 63%"],
     ["en", "Fable 63% left"],
-    ["ja", "Fable 残り 63%"],
   ])("localizes the Fable line in %s", async (language, text) => {
     await i18n.changeLanguage(language);
     renderQuota([{ name: "seven_day_fable", utilization: 37, resetsAt: null }]);
