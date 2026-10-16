@@ -1,6 +1,6 @@
 //! 项目 Profile 数据访问对象
 //!
-//! profiles 表存放全应用共享的项目实体（供应商/MCP/Skills/Prompt 快照），
+//! profiles 表存放全应用共享的项目实体（供应商/MCP/Skills 快照），
 //! payload 为原始 JSON 文本（按 app 分槽），解析在 service 层进行。
 //! 各应用分组（scope）独立的 current 标记存放于 settings 表（key-value）。
 

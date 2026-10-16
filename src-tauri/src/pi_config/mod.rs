@@ -473,7 +473,7 @@ fn nonempty_string(value: Option<&Value>) -> Option<&str> {
 
 #[cfg(test)]
 pub(crate) mod test_support {
-    use std::path::{Path, PathBuf};
+    use std::path::PathBuf;
 
     pub(crate) struct TestAgentDir {
         _dir: Option<tempfile::TempDir>,
@@ -485,10 +485,6 @@ pub(crate) mod test_support {
             let dir = tempfile::tempdir().expect("create Pi test directory");
             let agent_dir = dir.path().join("agent");
             Self::set(agent_dir, Some(dir))
-        }
-
-        pub(crate) fn at(agent_dir: &Path) -> Self {
-            Self::set(agent_dir.to_path_buf(), None)
         }
 
         fn set(agent_dir: PathBuf, dir: Option<tempfile::TempDir>) -> Self {

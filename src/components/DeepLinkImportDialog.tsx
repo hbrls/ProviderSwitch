@@ -19,7 +19,6 @@ import { Button } from "@/components/ui/button";
 import { toast } from "@/lib/toast";
 import { useTranslation } from "react-i18next";
 import { useQueryClient } from "@tanstack/react-query";
-import { PromptConfirmation } from "./deeplink/PromptConfirmation";
 import { McpConfirmation } from "./deeplink/McpConfirmation";
 import { ProviderIcon } from "./ProviderIcon";
 import {
@@ -299,19 +298,6 @@ export function DeepLinkImportDialog() {
             }),
             closeButton: true,
           });
-        } else if (result.type === "prompt") {
-          // Prompts don't use React Query, trigger a custom event for refresh
-          window.dispatchEvent(
-            new CustomEvent("prompt-imported", {
-              detail: { app: request.app },
-            }),
-          );
-          toast.success(t("deeplink.promptImportSuccess"), {
-            description: t("deeplink.promptImportSuccessDescription", {
-              name: request.name,
-            }),
-            closeButton: true,
-          });
         } else if (result.type === "mcp") {
           await refreshMcp(result);
         }
@@ -410,8 +396,6 @@ export function DeepLinkImportDialog() {
   const getTitle = () => {
     if (!request) return t("deeplink.confirmImport");
     switch (request.resource) {
-      case "prompt":
-        return t("deeplink.importPrompt");
       case "mcp":
         return t("deeplink.importMcp");
       default:
@@ -422,8 +406,6 @@ export function DeepLinkImportDialog() {
   const getDescription = () => {
     if (!request) return t("deeplink.confirmImportDescription");
     switch (request.resource) {
-      case "prompt":
-        return t("deeplink.importPromptDescription");
       case "mcp":
         return t("deeplink.importMcpDescription");
       default:
@@ -444,13 +426,6 @@ export function DeepLinkImportDialog() {
 
             {/* 主体内容整体右移，略大于标题内边距，让内容看起来不贴边 */}
             <div className="space-y-4 px-8 py-4 max-h-[60vh] overflow-y-auto [scrollbar-width:thin] [&::-webkit-scrollbar]:w-1.5 [&::-webkit-scrollbar]:block [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-subtle">
-              {request.resource === "prompt" && (
-                <PromptConfirmation
-                  request={request}
-                  enableAfterImport={activateAfterImport}
-                  onEnableAfterImportChange={setActivateAfterImport}
-                />
-              )}
               {request.resource === "mcp" && (
                 <McpConfirmation request={request} />
               )}

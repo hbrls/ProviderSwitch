@@ -59,7 +59,6 @@ pub(crate) fn should_trigger_auto_sync_for_table(table: &str) -> bool {
         "providers"
             | "provider_endpoints"
             | "mcp_servers"
-            | "prompts"
             | "skills"
             | "skill_repos"
             | "profiles"
@@ -76,20 +75,6 @@ pub(crate) fn localized(
     en: impl Into<String>,
 ) -> AppError {
     AppError::localized(key, zh, en)
-}
-
-pub(crate) fn io_context_localized(
-    _key: &'static str,
-    zh: impl Into<String>,
-    en: impl Into<String>,
-    source: std::io::Error,
-) -> AppError {
-    let zh_msg = zh.into();
-    let en_msg = en.into();
-    AppError::IoContext {
-        context: format!("{zh_msg} ({en_msg})"),
-        source,
-    }
 }
 
 // ─── Types ───────────────────────────────────────────────────
@@ -438,7 +423,6 @@ mod tests {
             "providers",
             "provider_endpoints",
             "mcp_servers",
-            "prompts",
             "skills",
             "skill_repos",
             "profiles",
