@@ -11,7 +11,7 @@ use axum::{
 use bytes::Bytes;
 use http_body_util::BodyExt;
 use serde_json::{json, Value};
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
 use crate::{
     provider::Provider,
@@ -26,6 +26,165 @@ use crate::{
         ProxyError,
     },
 };
+
+use crate::error::AppError;
+use crate::services::stream_check::{HealthStatus, StreamCheckConfig, StreamCheckResult};
+use reqwest::Client;
+
+/// Kilo 显式客户端工厂：由供应商配置精确决定直连或代理，不继承全局/系统/环境代理。
+///
+/// 供连通性检测等需要按 Provider `options.proxy` 精确控制代理的路径使用：
+/// - `None` → 显式直连：`no_proxy()` 禁止环境变量 / 系统代理，本机目标也直连；
+/// - `Some(url)` → 所有目标（含 localhost / 127.0.0.1 / ::1）一律走该代理，无绕过逻辑。
+///
+/// 与 全局客户端工厂 不同，这里不做业务层 scheme 白名单校验——地址能否构建、能否连接
+/// 由网络库决定；也不设 client 总超时，单次请求超时由调用方 `.timeout()` 控制，
+/// 后续流式转发可复用此工厂。构造失败必须上抛，禁止回退全局/直连 client。
+pub(crate) fn build_http_client(proxy_url: Option<&str>) -> Result<Client, String> {
+    let mut builder = Client::builder()
+        // 先禁用自动代理：显式 no_proxy + 显式 Proxy::all 之外的来源一律不生效
+        .no_proxy()
+        .connect_timeout(Duration::from_secs(30))
+        .pool_max_idle_per_host(10)
+        .tcp_keepalive(Duration::from_secs(60))
+        // 与全局客户端口径一致：禁用自动解压，禁用自动重定向
+        .no_gzip()
+        .no_brotli()
+        .no_deflate()
+        .no_zstd()
+        .redirect(reqwest::redirect::Policy::none());
+
+    if let Some(url) = proxy_url {
+        let proxy = reqwest::Proxy::all(url).map_err(|e| {
+            format!(
+                "Invalid proxy URL '{}': {}",
+                crate::proxy::http_client::mask_url(url),
+                e
+            )
+        })?;
+        builder = builder.proxy(proxy);
+    }
+
+    builder
+        .build()
+        .map_err(|e| format!("Failed to build HTTP client: {e}"))
+}
+
+/// Provider 级 Kilo 代理：`settings_config.options.proxy`。
+///
+/// as_str → trim → 过滤空字符串；缺失、空串、纯空白、非字符串均为无值（直连）。
+/// 非空值原样交给客户端工厂，不在此处做 scheme/host/port 等格式校验。
+fn extract_proxy(provider: &Provider) -> Option<String> {
+    provider
+        .settings_config
+        .get("options")
+        .and_then(|value| value.get("proxy"))
+        .and_then(|value| value.as_str())
+        .map(|value| value.trim().to_string())
+        .filter(|value| !value.is_empty())
+}
+
+/// 按 Provider 的代理配置执行一次 GET 探测；任意 HTTP 响应均视为可达，不重试。
+pub async fn check_provider(provider: &Provider) -> Result<StreamCheckResult, AppError> {
+    let config = StreamCheckConfig::default();
+    let started = Instant::now();
+    let result: Result<u16, AppError> = async {
+        let base_url = reachability_base_url(provider)?;
+        let uri: Uri = base_url
+            .parse()
+            .map_err(|e| AppError::Message(format!("Invalid Kilo base URL: {e}")))?;
+        let authority = uri
+            .authority()
+            .ok_or_else(|| AppError::Message("Kilo base URL has no host".to_string()))?;
+        let mut headers = HeaderMap::new();
+        headers.insert(
+            header::HOST,
+            HeaderValue::from_str(authority.as_str())
+                .map_err(|e| AppError::Message(format!("Invalid Kilo host: {e}")))?,
+        );
+        headers.insert(header::ACCEPT, HeaderValue::from_static("*/*"));
+        headers.insert(
+            header::ACCEPT_ENCODING,
+            HeaderValue::from_static("identity"),
+        );
+        if let Some(ua) = provider
+            .meta
+            .as_ref()
+            .and_then(|meta| meta.custom_user_agent_header().ok().flatten())
+        {
+            headers.insert(header::USER_AGENT, ua);
+        }
+        let mut extensions = http::Extensions::new();
+        extensions.insert(crate::proxy::hyper_client::OriginalHeaderCases {
+            cases: headers
+                .keys()
+                .map(|name| (name.as_str().to_string(), name.as_str().as_bytes().to_vec()))
+                .collect(),
+        });
+        let proxy = extract_proxy(provider);
+        let response = send_request(
+            uri,
+            "Kilo provider reachability check",
+            Method::GET,
+            headers,
+            extensions,
+            Vec::new(),
+            Duration::from_secs(config.timeout_secs),
+            proxy.as_deref(),
+        )
+        .await
+        .map_err(|e| AppError::Message(e.to_string()))?;
+        Ok(response.status().as_u16())
+    }
+    .await;
+    let elapsed = started.elapsed().as_millis() as u64;
+    let (status, success, message, http_status) = match result {
+        Ok(code) => (
+            if elapsed <= config.degraded_threshold_ms {
+                HealthStatus::Operational
+            } else {
+                HealthStatus::Degraded
+            },
+            true,
+            "Reachable".to_string(),
+            Some(code),
+        ),
+        Err(error) => (HealthStatus::Failed, false, error.to_string(), None),
+    };
+    Ok(StreamCheckResult {
+        status,
+        success,
+        message,
+        response_time_ms: Some(elapsed),
+        http_status,
+        tested_at: chrono::Utc::now().timestamp(),
+        retry_count: 0,
+    })
+}
+
+pub(crate) fn reachability_base_url(provider: &Provider) -> Result<String, AppError> {
+    provider
+        .settings_config
+        .get("options")
+        .and_then(|value| value.as_object())
+        .and_then(|options| options.get("baseURL"))
+        .and_then(|value| value.as_str())
+        .map(|value| value.trim().to_string())
+        .filter(|value| !value.is_empty())
+        .ok_or_else(|| {
+            AppError::localized(
+                "kilo_base_url_missing",
+                "Kilo 供应商缺少 options.baseURL",
+                "Kilo provider is missing `options.baseURL`",
+            )
+        })
+}
+
+/// 为 Kilo 连通性检测选择 Provider 自身的代理配置。
+pub(crate) fn reachability_client(provider: &Provider) -> Result<Client, AppError> {
+    build_http_client(extract_proxy(provider).as_deref())
+        .map_err(|error| AppError::Message(format!("Failed to build Kilo HTTP client: {error}")))
+}
 
 const APP_TYPE: &str = "kilo";
 const TAG: &str = "Kilo";
@@ -243,7 +402,7 @@ pub async fn handle_chat_completions(
 
     let (parts, body) = request.into_parts();
     let mut headers = parts.headers;
-    let extensions = parts.extensions;
+    let mut extensions = parts.extensions;
     let mut body_bytes = body
         .collect()
         .await
@@ -422,15 +581,34 @@ pub async fn handle_chat_completions(
         HeaderValue::from_str(&request_body.len().to_string()).unwrap(),
     );
 
+    outbound_headers.insert(
+        HeaderName::from_static("x-provider-switch"),
+        HeaderValue::from_static("Kilo"),
+    );
+    // Keep the existing raw sender available even without captured header cases.
+    let mut original_cases = extensions
+        .get::<crate::proxy::hyper_client::OriginalHeaderCases>()
+        .cloned()
+        .unwrap_or_default();
+    original_cases
+        .cases
+        .retain(|(name, _)| !name.eq_ignore_ascii_case("x-provider-switch"));
+    original_cases.cases.push((
+        "x-provider-switch".to_string(),
+        b"X-Provider-Switch".to_vec(),
+    ));
+    extensions.insert(original_cases);
+    let proxy = extract_proxy(&provider);
+
     let response = send_request(
         uri,
         "Kilo upstream /chat/completions",
         Method::POST,
         outbound_headers,
-        extensions.clone(),
+        extensions,
         request_body,
         timeout_for(&config),
-        crate::proxy::http_client::get_current_proxy_url().as_deref(),
+        proxy.as_deref(),
     )
     .await;
     let error = match response {
@@ -689,9 +867,131 @@ fn kilo_error(status: StatusCode, code: &str, message: impl Into<String>) -> Res
 
 #[cfg(test)]
 mod tests {
-    use super::{apply_provider_request_overrides, parse_provider, validate_provider_settings};
+    use super::{
+        apply_provider_request_overrides, build_http_client, parse_provider,
+        validate_provider_settings,
+    };
     use crate::provider::Provider;
     use serde_json::json;
+
+    use std::{env, time::Duration};
+
+    fn spawn_ok_server() -> String {
+        use std::io::{Read, Write};
+        let listener = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
+        let addr = listener.local_addr().unwrap();
+        std::thread::spawn(move || {
+            for stream in listener.incoming().take(4) {
+                let Ok(mut stream) = stream else { continue };
+                let mut buf = [0u8; 1024];
+                let _ = stream.read(&mut buf);
+                let _ = stream.write_all(
+                    b"HTTP/1.1 200 OK\r\nContent-Length: 2\r\nConnection: close\r\n\r\nok",
+                );
+            }
+        });
+        format!("http://{addr}/v1/models")
+    }
+
+    #[test]
+    fn test_build_http_client_direct() {
+        let result = build_http_client(None);
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn test_build_http_client_with_proxy() {
+        let result = build_http_client(Some("http://127.0.0.1:7890"));
+        assert!(result.is_ok());
+        let result = build_http_client(Some("socks5://127.0.0.1:1080"));
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn test_build_http_client_rejects_invalid_proxy() {
+        // 不做业务层 scheme 白名单：地址能否被构建由 reqwest 自身决定，
+        // 这里只验证完全无法解析的输入会返回错误
+        let result = build_http_client(Some("http://"));
+        assert!(result.is_err(), "Should reject empty-host proxy URL");
+        let result = build_http_client(Some("://missing-scheme"));
+        assert!(result.is_err(), "Should reject unparseable proxy URL");
+    }
+
+    #[tokio::test]
+    async fn test_kilo_client_proxy_never_bypasses_loopback() {
+        let url = spawn_ok_server();
+        // 本机目标配有代理时也必须走代理：代理不可连则整体失败，不回退直连
+        let proxied = build_http_client(Some("http://127.0.0.1:1")).unwrap();
+        assert!(proxied
+            .get(&url)
+            .timeout(Duration::from_secs(5))
+            .send()
+            .await
+            .is_err());
+        // 显式直连（None）始终能到达本机服务
+        let direct = build_http_client(None).unwrap();
+        let resp = direct
+            .get(&url)
+            .timeout(Duration::from_secs(5))
+            .send()
+            .await
+            .expect("kilo direct client should reach the local server");
+        assert_eq!(resp.status().as_u16(), 200);
+    }
+
+    #[tokio::test]
+    #[serial_test::serial]
+    async fn test_kilo_client_direct_ignores_env_proxy() {
+        let keys = [
+            "HTTP_PROXY",
+            "http_proxy",
+            "HTTPS_PROXY",
+            "https_proxy",
+            "ALL_PROXY",
+            "all_proxy",
+        ];
+        let saved: Vec<(&str, Option<String>)> =
+            keys.iter().map(|k| (*k, env::var(k).ok())).collect();
+        for key in &keys {
+            env::set_var(key, "http://127.0.0.1:1");
+        }
+
+        let url = spawn_ok_server();
+        let direct = build_http_client(None).unwrap();
+        let result = direct
+            .get(&url)
+            .timeout(Duration::from_secs(5))
+            .send()
+            .await;
+
+        for (key, value) in saved {
+            match value {
+                Some(value) => env::set_var(key, value),
+                None => env::remove_var(key),
+            }
+        }
+
+        let resp = result.expect("kilo direct client must ignore env proxies");
+        assert_eq!(resp.status().as_u16(), 200);
+    }
+
+    #[test]
+    fn test_extract_kilo_proxy_variants() {
+        for (config, expected) in [
+            (serde_json::json!({}), None),
+            (serde_json::json!({ "options": {} }), None),
+            (serde_json::json!({ "options": { "proxy": "" } }), None),
+            (serde_json::json!({ "options": { "proxy": "   " } }), None),
+            (serde_json::json!({ "options": { "proxy": 123 } }), None),
+            (
+                serde_json::json!({ "options": { "proxy": " http://127.0.0.1:7890 " } }),
+                Some("http://127.0.0.1:7890".to_string()),
+            ),
+        ] {
+            let p = Provider::with_id("test".into(), "Test".into(), config, None);
+            assert_eq!(super::extract_proxy(&p), expected);
+        }
+    }
 
     fn valid_settings() -> serde_json::Value {
         json!({

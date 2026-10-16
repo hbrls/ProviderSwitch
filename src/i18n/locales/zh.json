@@ -1083,6 +1083,17 @@
       "configPreview": "Kilo 配置 JSON",
       "providerName": "供应商名称",
       "baseUrl": "Base URL",
+      "proxy": "HTTP/HTTPS 代理",
+      "proxyError": {
+        "invalidUrl": "代理地址必须是合法的 http(s) URL，例如 http://127.0.0.1:7890",
+        "unsupportedScheme": "代理协议必须是 http 或 https",
+        "missingHost": "代理地址缺少主机名",
+        "noUserInfo": "代理地址不能包含用户名或密码",
+        "noQuery": "代理地址不能包含查询参数",
+        "noFragment": "代理地址不能包含片段标识",
+        "noPath": "代理地址仅允许根路径",
+        "invalidPort": "代理端口必须是数字"
+      },
       "apiKey": "API Key",
       "models": "模型",
       "modelId": "模型 ID",
