@@ -219,6 +219,10 @@ impl McpService {
             }
             AppType::Mcode => mcp::mcode::sync(&server.id, Some(&server.server))?,
             AppType::Pi => mcp::pi::sync(&server.id, Some(&server.server))?,
+            AppType::Kilo => {
+                // Kilo has no MCP registry in this phase.
+                log::debug!("Kilo MCP sync is not supported, skipping");
+            }
         }
         Ok(())
     }
@@ -260,6 +264,10 @@ impl McpService {
             }
             AppType::Mcode => mcp::mcode::sync(id, None)?,
             AppType::Pi => mcp::pi::sync(id, None)?,
+            AppType::Kilo => {
+                // Kilo has no MCP registry in this phase.
+                log::debug!("Kilo MCP sync is not supported, skipping remove");
+            }
         }
         Ok(())
     }

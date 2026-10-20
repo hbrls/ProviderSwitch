@@ -534,6 +534,13 @@ export const iconMetadata: Record<string, IconMetadata> = {
     keywords: [],
     defaultColor: "currentColor",
   },
+  kilo: {
+    name: "kilo",
+    displayName: "Kilo Code",
+    category: "ai-provider",
+    keywords: ["kilo", "kilo code", "coding agent"],
+    defaultColor: "currentColor",
+  },
   kimi: {
     name: "kimi",
     displayName: "Kimi",
@@ -747,6 +754,13 @@ export const iconMetadata: Record<string, IconMetadata> = {
     category: "ai-provider",
     keywords: ["chatglm", "glm"],
     defaultColor: "#0F62FE",
+  },
+  zai: {
+    name: "zai",
+    displayName: "Z.ai",
+    category: "ai-provider",
+    keywords: ["z.ai", "glm", "bigmodel", "zhipu"],
+    defaultColor: "currentColor",
   },
   openrouter: {
     name: "openrouter",
