@@ -336,6 +336,11 @@ pub(crate) fn build_provider_from_request(
         AppType::Codex => build_codex_settings(request)?,
         AppType::Gemini => build_gemini_settings(request),
         AppType::GrokBuild => build_grokbuild_settings(request)?,
+        AppType::Kilo => {
+            return Err(AppError::InvalidInput(
+                "Kilo providers do not support deep link import yet".to_string(),
+            ));
+        }
         AppType::OpenCode => build_opencode_settings(request, api_format),
         AppType::OpenClaw => build_additive_app_settings(request, api_format),
         AppType::Hermes => build_hermes_settings(request, api_format),

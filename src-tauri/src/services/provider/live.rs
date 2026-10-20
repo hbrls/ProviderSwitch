@@ -303,6 +303,7 @@ fn settings_contain_common_config(app_type: &AppType, settings: &Value, snippet:
         | AppType::Mcode
         | AppType::Agy
         | AppType::ClaudeDesktop => false,
+        | AppType::Kilo => false,
     }
 }
 
@@ -373,6 +374,7 @@ pub(crate) fn remove_common_config_from_settings(
             Ok(result)
         }
         AppType::GrokBuild
+        | AppType::Kilo
         | AppType::OpenCode
         | AppType::OpenClaw
         | AppType::Hermes
@@ -565,6 +567,11 @@ pub(crate) fn write_live_snapshot(app_type: &AppType, provider: &Provider) -> Re
                 "Grok Build configuration must be written through the key-field write flow",
             ));
         }
+        AppType::Kilo => {
+            return Err(AppError::InvalidInput(
+                "Kilo has no live config in this phase".to_string(),
+            ));
+        }        
         AppType::OpenCode => {
             // OpenCode uses additive mode - write provider to config
             use crate::opencode_config;
@@ -956,6 +963,9 @@ pub fn read_live_settings(app_type: AppType) -> Result<Value, AppError> {
             Ok(config)
         }
         AppType::GrokBuild => crate::grok_config::read_grok_live_settings(),
+        AppType::Kilo => Err(AppError::InvalidInput(
+            "Kilo has no live config in this phase".to_string(),
+        ))
         AppType::OpenClaw => {
             use crate::openclaw_config::{get_openclaw_config_path, read_openclaw_config};
 
@@ -1105,6 +1115,11 @@ pub fn import_default_config(state: &AppState, app_type: AppType) -> Result<bool
         // OpenCode, OpenClaw and Hermes use additive mode and are handled by early return above
         AppType::OpenCode | AppType::OpenClaw | AppType::Hermes | AppType::Pi | AppType::Mcode => {
             unreachable!("additive mode apps are handled by early return")
+        }
+        AppType::Kilo => {
+            return Err(AppError::InvalidInput(
+                "Kilo providers do not support live config import in this phase".to_string(),
+            ));
         }
     };
 

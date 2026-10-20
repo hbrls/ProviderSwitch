@@ -304,6 +304,7 @@ export interface VisibleApps {
   codex: boolean;
   gemini: boolean;
   grokbuild: boolean;
+  kilo: boolean;
   opencode: boolean;
   openclaw: boolean;
   hermes: boolean;
@@ -429,6 +430,8 @@ export interface Settings {
   currentProviderCodex?: string;
   // 当前 Gemini 供应商 ID（优先于数据库 is_current）
   currentProviderGemini?: string;
+  // 当前 Kilo 供应商 ID（优先于数据库 is_current）
+  currentProviderKilo?: string;
 
   // ===== 备份策略设置 =====
   // Auto-backup interval in hours (0=disabled, default 24)
