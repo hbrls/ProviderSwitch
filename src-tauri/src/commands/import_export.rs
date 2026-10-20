@@ -12,15 +12,20 @@ use crate::database::backup::BackupEntry;
 use crate::database::Database;
 use crate::error::AppError;
 use crate::services::provider::ProviderService;
-use crate::services::sync_protocol::sync_mutex;
 use crate::store::AppState;
+
+/// Serialize SQL imports and backup restores before starting blocking work.
+fn database_restore_mutex() -> &'static tokio::sync::Mutex<()> {
+    static LOCK: tokio::sync::Mutex<()> = tokio::sync::Mutex::const_new(());
+    &LOCK
+}
 
 async fn run_with_database_restore_lock<T, Start, Fut>(start_operation: Start) -> T
 where
     Start: FnOnce() -> Fut,
     Fut: std::future::Future<Output = T>,
 {
-    let _sync_guard = sync_mutex().lock().await;
+    let _restore_guard = database_restore_mutex().lock().await;
     start_operation().await
 }
 
@@ -219,15 +224,14 @@ pub async fn reveal_backup_location(id: String) -> Result<bool, String> {
 
 #[cfg(test)]
 mod tests {
-    use super::run_with_database_restore_lock;
-    use crate::services::sync_protocol::sync_mutex;
+    use super::{database_restore_mutex, run_with_database_restore_lock};
     use std::sync::atomic::{AtomicBool, Ordering};
     use std::sync::Arc;
     use std::time::Duration;
 
     #[tokio::test]
     async fn manual_restore_starts_blocking_work_after_global_lock_acquisition() {
-        let guard = sync_mutex().lock().await;
+        let guard = database_restore_mutex().lock().await;
         let entered = Arc::new(AtomicBool::new(false));
         let entered_in_task = Arc::clone(&entered);
         let restore = run_with_database_restore_lock(move || {
@@ -241,7 +245,7 @@ mod tests {
             tokio::time::timeout(Duration::from_millis(40), restore.as_mut())
                 .await
                 .is_err(),
-            "restore must wait while another sync operation holds the global lock"
+            "restore must wait while another restore operation holds the global lock"
         );
         assert!(!entered.load(Ordering::SeqCst));
 
