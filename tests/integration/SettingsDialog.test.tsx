@@ -41,9 +41,6 @@ vi.mock("@/components/theme-provider", () => ({
 vi.mock("@/components/settings/BackupListSection", () => ({
   BackupListSection: () => <div>backup-list-section</div>,
 }));
-vi.mock("@/components/settings/WebdavSyncSection", () => ({
-  WebdavSyncSection: () => <div>webdav-sync-section</div>,
-}));
 vi.mock("@/components/settings/LogConfigPanel", () => ({
   LogConfigPanel: () => <div>log-config-panel</div>,
 }));
