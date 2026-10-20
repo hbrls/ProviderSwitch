@@ -11,7 +11,7 @@ use axum::{
 use bytes::Bytes;
 use http_body_util::BodyExt;
 use serde_json::{json, Value};
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
 use crate::{
     provider::Provider,
@@ -26,6 +26,118 @@ use crate::{
         ProxyError,
     },
 };
+
+use crate::error::AppError;
+use crate::services::stream_check::{HealthStatus, StreamCheckConfig, StreamCheckResult};
+/// Provider 级 Kilo 代理：`settings_config.options.proxy`。
+///
+/// as_str → trim → 过滤空字符串；缺失、空串、纯空白、非字符串均为无值（直连）。
+/// 非空值原样交给客户端工厂，不在此处做 scheme/host/port 等格式校验。
+fn extract_proxy(provider: &Provider) -> Option<String> {
+    provider
+        .settings_config
+        .get("options")
+        .and_then(|value| value.get("proxy"))
+        .and_then(|value| value.as_str())
+        .map(|value| value.trim().to_string())
+        .filter(|value| !value.is_empty())
+}
+
+/// 按 Provider 的代理配置执行一次 GET 探测；任意 HTTP 响应均视为可达，不重试。
+pub async fn check_provider(provider: &Provider) -> Result<StreamCheckResult, AppError> {
+    let config = StreamCheckConfig::default();
+    let started = Instant::now();
+    let result: Result<u16, AppError> = async {
+        let base_url = reachability_base_url(provider)?;
+        let uri: Uri = base_url
+            .parse()
+            .map_err(|e| AppError::Message(format!("Invalid Kilo base URL: {e}")))?;
+        let authority = uri
+            .authority()
+            .ok_or_else(|| AppError::Message("Kilo base URL has no host".to_string()))?;
+        let mut headers = HeaderMap::new();
+        headers.insert(
+            header::HOST,
+            HeaderValue::from_str(authority.as_str())
+                .map_err(|e| AppError::Message(format!("Invalid Kilo host: {e}")))?,
+        );
+        headers.insert(header::ACCEPT, HeaderValue::from_static("*/*"));
+        headers.insert(
+            header::ACCEPT_ENCODING,
+            HeaderValue::from_static("identity"),
+        );
+        if let Some(ua) = provider
+            .meta
+            .as_ref()
+            .and_then(|meta| meta.custom_user_agent_header().ok().flatten())
+        {
+            headers.insert(header::USER_AGENT, ua);
+        }
+        let mut extensions = http::Extensions::new();
+        extensions.insert(crate::proxy::hyper_client::OriginalHeaderCases {
+            cases: headers
+                .keys()
+                .map(|name| (name.as_str().to_string(), name.as_str().as_bytes().to_vec()))
+                .collect(),
+        });
+        let proxy = extract_proxy(provider);
+        let response = send_request(
+            uri,
+            "Kilo provider reachability check",
+            Method::GET,
+            headers,
+            extensions,
+            Vec::new(),
+            Duration::from_secs(config.timeout_secs),
+            proxy.as_deref(),
+        )
+        .await
+        .map_err(|e| AppError::Message(e.to_string()))?;
+        Ok(response.status().as_u16())
+    }
+    .await;
+    let elapsed = started.elapsed().as_millis() as u64;
+    let (status, success, message, http_status) = match result {
+        Ok(code) => (
+            if elapsed <= config.degraded_threshold_ms {
+                HealthStatus::Operational
+            } else {
+                HealthStatus::Degraded
+            },
+            true,
+            "Reachable".to_string(),
+            Some(code),
+        ),
+        Err(error) => (HealthStatus::Failed, false, error.to_string(), None),
+    };
+    Ok(StreamCheckResult {
+        status,
+        success,
+        message,
+        response_time_ms: Some(elapsed),
+        http_status,
+        tested_at: chrono::Utc::now().timestamp(),
+        retry_count: 0,
+    })
+}
+
+pub(crate) fn reachability_base_url(provider: &Provider) -> Result<String, AppError> {
+    provider
+        .settings_config
+        .get("options")
+        .and_then(|value| value.as_object())
+        .and_then(|options| options.get("baseURL"))
+        .and_then(|value| value.as_str())
+        .map(|value| value.trim().to_string())
+        .filter(|value| !value.is_empty())
+        .ok_or_else(|| {
+            AppError::localized(
+                "kilo_base_url_missing",
+                "Kilo 供应商缺少 options.baseURL",
+                "Kilo provider is missing `options.baseURL`",
+            )
+        })
+}
 
 const APP_TYPE: &str = "kilo";
 const TAG: &str = "Kilo";
@@ -243,7 +355,7 @@ pub async fn handle_chat_completions(
 
     let (parts, body) = request.into_parts();
     let mut headers = parts.headers;
-    let extensions = parts.extensions;
+    let mut extensions = parts.extensions;
     let mut body_bytes = body
         .collect()
         .await
@@ -422,15 +534,34 @@ pub async fn handle_chat_completions(
         HeaderValue::from_str(&request_body.len().to_string()).unwrap(),
     );
 
+    outbound_headers.insert(
+        HeaderName::from_static("x-provider-switch"),
+        HeaderValue::from_static("Kilo"),
+    );
+    // Keep the existing raw sender available even without captured header cases.
+    let mut original_cases = extensions
+        .get::<crate::proxy::hyper_client::OriginalHeaderCases>()
+        .cloned()
+        .unwrap_or_default();
+    original_cases
+        .cases
+        .retain(|(name, _)| !name.eq_ignore_ascii_case("x-provider-switch"));
+    original_cases.cases.push((
+        "x-provider-switch".to_string(),
+        b"X-Provider-Switch".to_vec(),
+    ));
+    extensions.insert(original_cases);
+    let proxy = extract_proxy(&provider);
+
     let response = send_request(
         uri,
         "Kilo upstream /chat/completions",
         Method::POST,
         outbound_headers,
-        extensions.clone(),
+        extensions,
         request_body,
         timeout_for(&config),
-        crate::proxy::http_client::get_current_proxy_url().as_deref(),
+        proxy.as_deref(),
     )
     .await;
     let error = match response {
@@ -692,6 +823,24 @@ mod tests {
     use super::{apply_provider_request_overrides, parse_provider, validate_provider_settings};
     use crate::provider::Provider;
     use serde_json::json;
+
+    #[test]
+    fn test_extract_kilo_proxy_variants() {
+        for (config, expected) in [
+            (serde_json::json!({}), None),
+            (serde_json::json!({ "options": {} }), None),
+            (serde_json::json!({ "options": { "proxy": "" } }), None),
+            (serde_json::json!({ "options": { "proxy": "   " } }), None),
+            (serde_json::json!({ "options": { "proxy": 123 } }), None),
+            (
+                serde_json::json!({ "options": { "proxy": " http://127.0.0.1:7890 " } }),
+                Some("http://127.0.0.1:7890".to_string()),
+            ),
+        ] {
+            let p = Provider::with_id("test".into(), "Test".into(), config, None);
+            assert_eq!(super::extract_proxy(&p), expected);
+        }
+    }
 
     fn valid_settings() -> serde_json::Value {
         json!({
