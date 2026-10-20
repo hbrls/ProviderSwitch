@@ -1115,6 +1115,17 @@
       "configPreview": "Kilo Configuration JSON",
       "providerName": "Provider Name",
       "baseUrl": "Base URL",
+      "proxy": "HTTP/HTTPS Proxy",
+      "proxyError": {
+        "invalidUrl": "Proxy must be a valid http(s) URL, e.g. http://127.0.0.1:7890",
+        "unsupportedScheme": "Proxy scheme must be http or https",
+        "missingHost": "Proxy is missing a host",
+        "noUserInfo": "Proxy URL must not contain a username or password",
+        "noQuery": "Proxy URL must not contain a query string",
+        "noFragment": "Proxy URL must not contain a fragment",
+        "noPath": "Proxy URL must use the root path",
+        "invalidPort": "Proxy port must be numeric"
+      },
       "apiKey": "API Key",
       "models": "Model",
       "modelId": "Model ID",
