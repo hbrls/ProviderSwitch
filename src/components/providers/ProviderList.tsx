@@ -437,7 +437,7 @@ export function ProviderList({
           appId={appId}
           onCreate={appId === "pi" ? undefined : onCreate}
           onImport={
-            appId === "pi" || appId === "mcode"
+            appId === "pi" || appId === "mcode" || appId === "kilo"
               ? undefined
               : () => importMutation.mutate()
           }

@@ -309,6 +309,7 @@ export interface VisibleApps {
   hermes: boolean;
   pi: boolean;
   mcode: boolean;
+  kilo: boolean;
 }
 
 /** 用量金额的显示方式；对应 Rust `UsageDisplaySettings`。值由前端校验兜底。 */
@@ -428,6 +429,8 @@ export interface Settings {
   currentProviderCodex?: string;
   // 当前 Gemini 供应商 ID（优先于数据库 is_current）
   currentProviderGemini?: string;
+  // 当前 Kilo 供应商 ID（优先于数据库 is_current）
+  currentProviderKilo?: string;
 
   // ===== 备份策略设置 =====
   // Auto-backup interval in hours (0=disabled, default 24)

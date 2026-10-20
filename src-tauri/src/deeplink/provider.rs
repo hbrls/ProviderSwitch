@@ -345,6 +345,11 @@ pub(crate) fn build_provider_from_request(
                 "Add MCode providers from the MCode page".into(),
             ))
         }
+        AppType::Kilo => {
+            return Err(AppError::InvalidInput(
+                "Kilo providers do not support deep link import yet".to_string(),
+            ));
+        }
     };
 
     // Build usage script configuration if provided
