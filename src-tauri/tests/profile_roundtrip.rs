@@ -593,11 +593,6 @@ fn profile_switch_in_routing_mode_changes_the_route_only() {
     );
 
     assert!(cc_switch_lib::mode::current::is_proxy(&AppType::Claude));
-    let (proxy_enabled_after, _) = state.db.get_proxy_flags_sync("claude");
-    assert!(
-        proxy_enabled_after,
-        "routing mode is mirrored for old versions"
-    );
     assert_eq!(
         cc_switch_lib::mode::current::provider_for(
             &state.db,

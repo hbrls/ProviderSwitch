@@ -1387,8 +1387,7 @@ mod tests {
         );
     }
 
-    /// An enabled flag left behind by an interrupted teardown is not enough to
-    /// suppress a live write when neither placeholder nor backup evidence exists.
+    /// Legacy SQLite flags do not override the JSON mode when editing a provider.
     #[tokio::test]
     #[serial]
     async fn update_current_claude_provider_ignores_enabled_flag_without_evidence() {
@@ -5625,6 +5624,20 @@ impl ProviderService {
             return pi::add(state, provider, add_to_live);
         }
 
+        // Kilo owns no native Live config. Save the provider and make the first
+        // provider current in both device settings and the database.
+        if app_type == AppType::Kilo {
+            Self::validate_provider_settings(&app_type, &provider)?;
+            state.db.save_provider(app_type.as_str(), &provider)?;
+            if crate::mode::current::database_direct_pointer(&state.db, &app_type)?.is_none() {
+                state
+                    .db
+                    .set_current_provider(app_type.as_str(), &provider.id)?;
+                crate::settings::set_current_provider(&app_type, Some(&provider.id))?;
+            }
+            return Ok(true);
+        }
+
         if app_type == AppType::Omp {
             return omp::add(state, provider, add_to_live);
         }
@@ -6237,6 +6250,18 @@ impl ProviderService {
         }
         Self::normalize_usage_script_credential_overrides(&app_type, &mut provider);
 
+        // Kilo owns no native live config. Editing a Kilo provider is a pure
+        // database update and must never enter the generic switch/live-sync path.
+        if app_type == AppType::Kilo {
+            if provider_id_changed {
+                return Err(AppError::Message(
+                    "Kilo provider ID cannot be changed after creation".to_string(),
+                ));
+            }
+            state.db.save_provider(app_type.as_str(), &provider)?;
+            return Ok(true);
+        }
+
         if provider_id_changed {
             if !app_type.is_additive_mode() {
                 return Err(AppError::Message(
@@ -6523,6 +6548,45 @@ impl ProviderService {
 
         if app_type == AppType::Omp {
             return omp::delete(state, id);
+        }
+
+        // Kilo provider deletion must not enter the native Live-config path.
+        // The active proxy route cannot be removed while the channel is enabled.
+        if app_type == AppType::Kilo {
+            let _guard = futures::executor::block_on(
+                state.proxy_service.lock_switch_for_app(app_type.as_str()),
+            );
+            let mode = crate::mode::current::mode_state(&app_type);
+            if mode.is_proxy() && mode.proxy_route.as_deref() == Some(id) {
+                return Err(AppError::Message(
+                    "不能删除当前正在使用的代理路由供应商".to_string(),
+                ));
+            }
+            let local_current = crate::mode::current::local_direct_pointer(&app_type);
+            let db_current = crate::mode::current::database_direct_pointer(&state.db, &app_type)?;
+            let was_current =
+                local_current.as_deref() == Some(id) || db_current.as_deref() == Some(id);
+
+            state.db.delete_provider(app_type.as_str(), id)?;
+
+            if was_current {
+                let next_current = state
+                    .db
+                    .get_all_providers(app_type.as_str())?
+                    .keys()
+                    .next()
+                    .cloned();
+                match next_current {
+                    Some(next_id) => {
+                        state.db.set_current_provider(app_type.as_str(), &next_id)?;
+                        crate::settings::set_current_provider(&app_type, Some(&next_id))?;
+                    }
+                    None => {
+                        crate::settings::set_current_provider(&app_type, None)?;
+                    }
+                }
+            }
+            return Ok(());
         }
 
         // Additive mode apps - no current provider concept
@@ -6856,6 +6920,12 @@ impl ProviderService {
                 route: Some(route),
                 ..Default::default()
             });
+        }
+
+        if app_type == AppType::Kilo {
+            state.db.set_current_provider(app_type.as_str(), id)?;
+            crate::settings::set_current_provider(&app_type, Some(id))?;
+            return Ok(SwitchResult::default());
         }
 
         // Normal mode: full switch with Live config write
@@ -7233,6 +7303,7 @@ impl ProviderService {
             AppType::Codex => Self::extract_codex_common_config(&provider.settings_config),
             AppType::Gemini => Self::extract_gemini_common_config(&provider.settings_config),
             AppType::GrokBuild => Ok(String::new()),
+            AppType::Kilo => Ok(String::new()),
             AppType::OpenCode => Self::extract_opencode_common_config(&provider.settings_config),
             AppType::OpenClaw => Self::extract_openclaw_common_config(&provider.settings_config),
             AppType::Hermes => Ok(String::new()), // Hermes doesn't use common config snippets
@@ -7253,6 +7324,7 @@ impl ProviderService {
             AppType::Codex => Self::extract_codex_common_config(settings_config),
             AppType::Gemini => Self::extract_gemini_common_config(settings_config),
             AppType::GrokBuild => Ok(String::new()),
+            AppType::Kilo => Ok(String::new()),
             AppType::OpenCode => Self::extract_opencode_common_config(settings_config),
             AppType::OpenClaw => Self::extract_openclaw_common_config(settings_config),
             AppType::Hermes => Ok(String::new()), // Hermes doesn't use common config snippets
@@ -8033,6 +8105,17 @@ impl ProviderService {
             AppType::Pi => {
                 crate::pi_config::validate_provider_node(&provider.id, &provider.settings_config)?;
             }
+            AppType::Kilo => {
+                crate::proxy::kilo::validate_provider_settings(&provider.settings_config).map_err(
+                    |message| {
+                        AppError::localized(
+                            "provider.kilo.settings.invalid",
+                            message.clone(),
+                            message,
+                        )
+                    },
+                )?;
+            }
             AppType::Omp => {
                 crate::omp_config::validate_provider(&provider.id, &provider.settings_config)?;
             }
@@ -8271,6 +8354,10 @@ impl ProviderService {
                     .to_string();
 
                 Ok((api_key, base_url))
+            }
+            AppType::Kilo => {
+                // Kilo has no credential extraction in this phase.
+                Ok((String::new(), String::new()))
             }
         }
     }

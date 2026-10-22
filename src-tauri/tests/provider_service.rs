@@ -2942,7 +2942,7 @@ fn recover_from_crash_without_backup_cleans_placeholder_instead_of_writing_it_ba
     reset_test_fs();
     let _home = ensure_test_home();
 
-    // 接管态 Claude Live，且 DB 中无备份（模拟切换 app_config_dir 后新库首启的场景）
+    // JSON 已提交退出代理的意图，客户端仍然接在代理上。
     let taken_over_live = json!({
         "env": {
             "ANTHROPIC_BASE_URL": "http://127.0.0.1:15721",
@@ -2959,7 +2959,7 @@ fn recover_from_crash_without_backup_cleans_placeholder_instead_of_writing_it_ba
 
     let state = create_test_state().expect("create test state");
 
-    // 模拟历史异常：接管态 Live 已被导入成 current provider（SSOT 被污染）
+    // 当前供应商被代理占位符污染时，退出也必须清理客户端。
     let provider = Provider::with_id(
         "default".to_string(),
         "default".to_string(),
@@ -2975,7 +2975,20 @@ fn recover_from_crash_without_backup_cleans_placeholder_instead_of_writing_it_ba
         .set_current_provider(AppType::Claude.as_str(), "default")
         .expect("set current provider");
 
-    // 启动时处理旧版遗留的接管态：没开代理（enabled=0），写回直连。
+    cc_switch_lib::mode::state::update(
+        &cc_switch_lib::live::engine::DeviceStore::for_device(),
+        |live| {
+            live.apps
+                .entry(AppType::Claude.as_str().into())
+                .or_default()
+                .set_mode_state(cc_switch_lib::mode::state::ModeState {
+                    mode: Some(cc_switch_lib::mode::state::Mode::Direct),
+                    attached: true,
+                    ..Default::default()
+                });
+        },
+    )
+    .expect("save JSON mode");
     futures::executor::block_on(cc_switch_lib::mode::controller::startup(&state));
 
     let live_after: serde_json::Value =
