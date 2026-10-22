@@ -129,7 +129,7 @@ impl Database {
 
         // 8. Proxy Config 表（三行结构，app_type 主键）
         conn.execute("CREATE TABLE IF NOT EXISTS proxy_config (
-            app_type TEXT PRIMARY KEY CHECK (app_type IN ('claude','codex','gemini','grokbuild')),
+            app_type TEXT PRIMARY KEY CHECK (app_type IN ('claude','codex','gemini','grokbuild','kilo')),
             proxy_enabled INTEGER NOT NULL DEFAULT 0, listen_address TEXT NOT NULL DEFAULT '127.0.0.1',
             listen_port INTEGER NOT NULL DEFAULT 15721, enable_logging INTEGER NOT NULL DEFAULT 1,
             enabled INTEGER NOT NULL DEFAULT 0, auto_failover_enabled INTEGER NOT NULL DEFAULT 0,
@@ -555,6 +555,7 @@ impl Database {
                         Self::set_user_version(conn, 18)?;
                     }
                     18 => {
+                        log::info!("迁移数据库从 v18 到 v19（MiCode）");
                         for table in ["mcp_servers", "skills"] {
                             if Self::table_exists(conn, table)? {
                                 Self::add_column_if_missing(
@@ -565,6 +566,8 @@ impl Database {
                                 )?;
                             }
                         }
+                        log::info!("迁移数据库从 v18 到 v19（允许 Kilo 独立代理配置）");
+                        Self::migrate_v18_to_v19(conn)?;
                         Self::set_user_version(conn, 19)?;
                     }
                     19 => {
@@ -615,6 +618,121 @@ impl Database {
                 Err(e)
             }
         }
+    }
+
+    /// v18 -> v19：扩展 proxy_config 的 app_type 白名单，允许 Kilo。
+    ///
+    /// SQLite 不能直接修改现有 CHECK 约束，因此使用完整字段列表重建表。
+    /// 不插入 Kilo 行；该行由 DAO 在首次读取/写入 Kilo proxy 配置时懒创建。
+    fn migrate_v18_to_v19(conn: &Connection) -> Result<(), AppError> {
+        if !Self::table_exists(conn, "proxy_config")? {
+            return Ok(());
+        }
+
+        conn.execute("DROP TABLE IF EXISTS proxy_config_v19", [])
+            .map_err(|e| AppError::Database(e.to_string()))?;
+        conn.execute(
+            "CREATE TABLE proxy_config_v19 (
+                app_type TEXT PRIMARY KEY CHECK (app_type IN ('claude','codex','gemini','grokbuild','kilo')),
+                proxy_enabled INTEGER NOT NULL DEFAULT 0,
+                listen_address TEXT NOT NULL DEFAULT '127.0.0.1',
+                listen_port INTEGER NOT NULL DEFAULT 15721,
+                enable_logging INTEGER NOT NULL DEFAULT 1,
+                enabled INTEGER NOT NULL DEFAULT 0,
+                auto_failover_enabled INTEGER NOT NULL DEFAULT 0,
+                max_retries INTEGER NOT NULL DEFAULT 3,
+                streaming_first_byte_timeout INTEGER NOT NULL DEFAULT 60,
+                streaming_idle_timeout INTEGER NOT NULL DEFAULT 120,
+                non_streaming_timeout INTEGER NOT NULL DEFAULT 600,
+                circuit_failure_threshold INTEGER NOT NULL DEFAULT 4,
+                circuit_success_threshold INTEGER NOT NULL DEFAULT 2,
+                circuit_timeout_seconds INTEGER NOT NULL DEFAULT 60,
+                circuit_error_rate_threshold REAL NOT NULL DEFAULT 0.6,
+                circuit_min_requests INTEGER NOT NULL DEFAULT 10,
+                default_cost_multiplier TEXT NOT NULL DEFAULT '1',
+                pricing_model_source TEXT NOT NULL DEFAULT 'response',
+                live_takeover_active INTEGER NOT NULL DEFAULT 0,
+                created_at TEXT NOT NULL DEFAULT (datetime('now')),
+                updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+            )",
+            [],
+        )
+        .map_err(|e| AppError::Database(e.to_string()))?;
+
+        let columns = [
+            "app_type",
+            "proxy_enabled",
+            "listen_address",
+            "listen_port",
+            "enable_logging",
+            "enabled",
+            "auto_failover_enabled",
+            "max_retries",
+            "streaming_first_byte_timeout",
+            "streaming_idle_timeout",
+            "non_streaming_timeout",
+            "circuit_failure_threshold",
+            "circuit_success_threshold",
+            "circuit_timeout_seconds",
+            "circuit_error_rate_threshold",
+            "circuit_min_requests",
+            "default_cost_multiplier",
+            "pricing_model_source",
+            "live_takeover_active",
+            "created_at",
+            "updated_at",
+        ];
+        let available = columns
+            .iter()
+            .map(|column| Self::has_column(conn, "proxy_config", column))
+            .collect::<Result<Vec<_>, AppError>>()?;
+        let select = columns
+            .iter()
+            .zip(available.iter())
+            .map(|(column, exists)| {
+                if *exists {
+                    format!("\"{column}\"")
+                } else {
+                    match *column {
+                        "app_type" => "'claude'".to_string(),
+                        "listen_address" => "'127.0.0.1'".to_string(),
+                        "listen_port" => "15721".to_string(),
+                        "enable_logging" => "1".to_string(),
+                        "max_retries" => "3".to_string(),
+                        "streaming_first_byte_timeout" => "60".to_string(),
+                        "streaming_idle_timeout" => "120".to_string(),
+                        "non_streaming_timeout" => "600".to_string(),
+                        "circuit_failure_threshold" => "4".to_string(),
+                        "circuit_success_threshold" => "2".to_string(),
+                        "circuit_timeout_seconds" => "60".to_string(),
+                        "circuit_error_rate_threshold" => "0.6".to_string(),
+                        "circuit_min_requests" => "10".to_string(),
+                        "default_cost_multiplier" => "'1'".to_string(),
+                        "pricing_model_source" => "'response'".to_string(),
+                        "created_at" | "updated_at" => "datetime('now')".to_string(),
+                        _ => "0".to_string(),
+                    }
+                }
+            })
+            .collect::<Vec<_>>()
+            .join(", ");
+        let column_list = columns
+            .iter()
+            .map(|column| format!("\"{column}\""))
+            .collect::<Vec<_>>()
+            .join(", ");
+        conn.execute(
+            &format!(
+                "INSERT INTO proxy_config_v19 ({column_list}) SELECT {select} FROM proxy_config"
+            ),
+            [],
+        )
+        .map_err(|e| AppError::Database(e.to_string()))?;
+        conn.execute("DROP TABLE proxy_config", [])
+            .map_err(|e| AppError::Database(e.to_string()))?;
+        conn.execute("ALTER TABLE proxy_config_v19 RENAME TO proxy_config", [])
+            .map_err(|e| AppError::Database(e.to_string()))?;
+        Ok(())
     }
 
     /// v0 -> v1 迁移：补齐所有缺失列
