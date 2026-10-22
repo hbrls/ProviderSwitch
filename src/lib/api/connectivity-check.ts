@@ -1,4 +1,4 @@
-import { invoke } from "@tauri-apps/api/core";
+import { Channel, invoke } from "@tauri-apps/api/core";
 import type { AppId } from "./types";
 
 // ===== 连通性检查类型 =====
@@ -26,4 +26,23 @@ export async function streamCheckProvider(
   providerId: string,
 ): Promise<StreamCheckResult> {
   return invoke("stream_check_provider", { appType, providerId });
+}
+
+export interface ProviderChatTestResult {
+  httpStatus: number;
+  responseTimeMs: number;
+}
+
+export function testProviderChat(
+  appType: AppId,
+  providerId: string,
+  onEvent: (event: string) => void,
+) {
+  const channel = new Channel<string>();
+  channel.onmessage = onEvent;
+  return invoke<ProviderChatTestResult>("test_provider_chat", {
+    appType,
+    providerId,
+    onEvent: channel,
+  });
 }
