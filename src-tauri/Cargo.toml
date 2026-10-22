@@ -27,12 +27,13 @@ serde_json = { version = "1.0", features = ["preserve_order"] }
 serde = { version = "1.0", features = ["derive"] }
 log = "0.4"
 chrono = { version = "0.4", features = ["serde"] }
-tauri = { version = "2.8.2", features = ["tray-icon", "protocol-asset", "image-png", "macos-private-api"] }
-tauri-plugin-log = "2"
+# Keep shared Rust/JS dependencies on matching minor releases in package.json.
+tauri = { version = "~2.10.3", features = ["macos-private-api", "tray-icon", "protocol-asset", "image-png"] }
+tauri-plugin-log = "~2.8.0"
 tauri-plugin-opener = "2"
-tauri-plugin-process = "2"
-tauri-plugin-updater = "2"
-tauri-plugin-dialog = "2"
+tauri-plugin-process = "~2.3.1"
+tauri-plugin-updater = "~2.10.0"
+tauri-plugin-dialog = "~2.6.0"
 tauri-plugin-store = "2"
 tauri-plugin-deep-link = "2"
 tauri-plugin-window-state = "2"
@@ -50,12 +51,10 @@ async-stream = "0.3"
 bytes = "1.5"
 axum = "0.7"
 tower = "0.4"
-tower-http = { version = "0.5", features = ["cors"] }
 hyper = { version = "1.0", features = ["full"] }
 hyper-util = { version = "0.1", features = ["tokio", "http1", "client-legacy"] }
 hyper-rustls = { version = "0.27", features = ["http1", "tls12", "ring", "webpki-tokio"] }
 http = "1"
-http-body = "1"
 http-body-util = "0.1"
 httparse = "1"
 tokio-rustls = "0.26"
@@ -65,8 +64,6 @@ rustls-native-certs = "0.8"
 regex = "1.10"
 rquickjs = { version = "0.8", features = ["array-buffer", "classes"] }
 thiserror = "2.0"
-anyhow = "1.0"
-zip = "2.2"
 serde_yaml = "0.9"
 tempfile = "3"
 url = "2.5"
@@ -118,6 +115,14 @@ objc2-app-kit = { version = "0.2", features = ["NSColor"] }
 objc2-06 = { package = "objc2", version = "0.6" }
 objc2-foundation-03 = { package = "objc2-foundation", version = "0.3", default-features = false, features = ["std", "NSArray", "NSGeometry", "NSString"] }
 objc2-app-kit-03 = { package = "objc2-app-kit", version = "0.3", default-features = false, features = ["std", "NSAppearance", "NSGlassEffectView", "NSGraphics", "NSResponder", "NSScreen", "NSView", "NSVisualEffectView", "NSWindow"] }
+
+# Agent 为主的工作流：不打断点，只依赖 panic backtrace 的文件名+行号定位失败
+[profile.dev]
+debug = "line-tables-only"
+
+# 依赖开优化加速测试执行；自身 crate 保持 opt-level = 0 以保留增量编译速度
+[profile.dev.package."*"]
+opt-level = 2
 
 # Optimize release binary size to help reduce AppImage footprint
 [profile.release]
