@@ -1633,6 +1633,7 @@ pub fn run() {
             commands::get_usage_data_sources,
             // Stream health check
             commands::stream_check_provider,
+            commands::test_provider_chat,
             // Session manager
             commands::list_sessions,
             commands::get_session_messages,

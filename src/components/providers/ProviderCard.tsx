@@ -1,4 +1,4 @@
-import { useMemo, useState, useEffect } from "react";
+import { useMemo, useState, useEffect, useCallback } from "react";
 import {
   AlertTriangle,
   GripVertical,
@@ -13,6 +13,7 @@ import type {
 } from "@dnd-kit/core";
 import type { Provider } from "@/types";
 import type { AppId } from "@/lib/api";
+import type { StreamCheckResult } from "@/lib/api/connectivity-check";
 import { authApi } from "@/lib/api";
 import { cn } from "@/lib/utils";
 import { ProviderIconBox } from "@/components/ProviderIconBox";
@@ -36,6 +37,7 @@ import { useUsageQuery } from "@/lib/query/queries";
 import { resolveProviderIcon } from "@/utils/providerIcon";
 import { isAdditiveAppId, isProxyAppId } from "@/config/appConfig";
 import { ProviderCardActions } from "./ProviderCardActions";
+import { ProviderConnectivityDialog } from "./ProviderConnectivityDialog";
 import type { CardChip, CardPresentation, CardTone } from "./presentation";
 
 interface DragHandleProps {
@@ -57,7 +59,7 @@ interface ProviderCardProps {
   onConfigureUsage: (provider: Provider) => void;
   onOpenWebsite: (url: string) => void;
   onDuplicate?: (provider: Provider) => void;
-  onTest?: (provider: Provider) => void;
+  onTest?: (provider: Provider) => Promise<StreamCheckResult | null> | void;
   onOpenTerminal?: (provider: Provider) => void;
   isTesting?: boolean;
   dragHandleProps?: DragHandleProps;
@@ -299,6 +301,15 @@ export function ProviderCard({
     usage.data.length > 1;
 
   const [isExpanded, setIsExpanded] = useState(false);
+  const [isConnectivityDialogOpen, setIsConnectivityDialogOpen] =
+    useState(false);
+  const checkConnectivity = useCallback(
+    (providerId: string) => {
+      if (!onTest || providerId !== provider.id) return Promise.resolve(null);
+      return Promise.resolve(onTest(provider) ?? null);
+    },
+    [onTest, provider],
+  );
   const expandLabel = isExpanded
     ? t("usage.collapse", { defaultValue: "收起" })
     : t("usage.expand", { defaultValue: "展开" });
@@ -568,7 +579,7 @@ export function ProviderCard({
               // 连通检测对第三方/自定义/Copilot/Codex-OAuth 供应商开放。官方供应商一律不给：
               // 它们 base_url 故意留空、走客户端默认/OAuth 端点，没有可靠的探测目标。
               onTest && appId !== "mcode" && provider.category !== "official"
-                ? () => onTest(provider)
+                ? () => setIsConnectivityDialogOpen(true)
                 : undefined
             }
             isTesting={isTesting}
@@ -586,6 +597,16 @@ export function ProviderCard({
           />
         </div>
       </div>
+
+      {onTest && appId !== "mcode" && provider.category !== "official" && (
+        <ProviderConnectivityDialog
+          appId={appId}
+          provider={provider}
+          open={isConnectivityDialogOpen}
+          onOpenChange={setIsConnectivityDialogOpen}
+          checkProvider={checkConnectivity}
+        />
+      )}
 
       {isExpanded && hasMultiplePlans && (
         <div className="mx-4 mb-3 border-t border-border pt-3">
