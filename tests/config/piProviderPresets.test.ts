@@ -67,7 +67,6 @@ describe("Pi provider presets", () => {
 
     expect(requestUrls).toMatchObject({
       "Kimi For Coding": "https://api.kimi.com/coding/v1/messages",
-      PackyCode: "https://www.packyapi.ai/v1/messages",
       AICodeMirror: "https://api.aicodemirror.ai/api/claudecode/v1/messages",
       OpenRouter: "https://openrouter.ai/api/v1/messages",
     });

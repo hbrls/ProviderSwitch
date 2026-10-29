@@ -260,46 +260,6 @@ export const hermesProviderPresets: HermesProviderPreset[] = [
     },
   },
   {
-    name: "PackyCode",
-    websiteUrl: "https://www.packyapi.ai",
-    apiKeyUrl: "https://www.packyapi.ai/register?aff=cc-switch",
-    settingsConfig: {
-      name: "packycode",
-      base_url: "https://www.packyapi.ai",
-      api_key: "",
-      api_mode: "anthropic_messages",
-      models: [
-        {
-          id: "claude-opus-5-5",
-          name: "Claude Opus 5.5",
-          context_length: 1000000,
-        },
-        {
-          id: "claude-sonnet-5-5",
-          name: "Claude Sonnet 5.5",
-          context_length: 1000000,
-        },
-        {
-          id: "claude-haiku-5-5",
-          name: "Claude Haiku 5.5",
-          context_length: 1000000,
-        },
-        {
-          id: "claude-fable-5-1",
-          name: "Claude Fable 5.1",
-          context_length: 1000000,
-        },
-      ],
-    },
-    category: "third_party",
-    isPartner: true,
-    partnerPromotionKey: "packycode",
-    icon: "packycode",
-    suggestedDefaults: {
-      model: { default: "claude-opus-5-5", provider: "packycode" },
-    },
-  },
-  {
     name: "APINebula",
     websiteUrl: "https://apinebula.ai",
     apiKeyUrl: "https://apinebula.ai/VjM74M",
@@ -927,46 +887,6 @@ export const hermesProviderPresets: HermesProviderPreset[] = [
     icon: "apikeyfun",
     suggestedDefaults: {
       model: { default: "claude-opus-5-5", provider: "apikeyfun" },
-    },
-  },
-  {
-    name: "9527CODE",
-    websiteUrl: "https://9527.codes",
-    apiKeyUrl: "https://9527.codes/register?aff=e5zI",
-    settingsConfig: {
-      name: "9527code",
-      base_url: "https://9527.codes",
-      api_key: "",
-      api_mode: "anthropic_messages",
-      models: [
-        {
-          id: "claude-opus-5-5",
-          name: "Claude Opus 5.5",
-          context_length: 1000000,
-        },
-        {
-          id: "claude-sonnet-5-5",
-          name: "Claude Sonnet 5.5",
-          context_length: 1000000,
-        },
-        {
-          id: "claude-haiku-5-5",
-          name: "Claude Haiku 5.5",
-          context_length: 1000000,
-        },
-        {
-          id: "claude-fable-5-1",
-          name: "Claude Fable 5.1",
-          context_length: 1000000,
-        },
-      ],
-    },
-    category: "aggregator",
-    isPartner: true,
-    partnerPromotionKey: "9527code",
-    icon: "9527code",
-    suggestedDefaults: {
-      model: { default: "claude-opus-5-5", provider: "9527code" },
     },
   },
   {

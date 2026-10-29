@@ -231,31 +231,6 @@ const piProviderPresetDefinitions: PiProviderPreset[] = [
     iconColor: "#6366F1",
   },
   {
-    name: "PackyCode",
-    providerKey: "cc-switch-packy-code",
-    websiteUrl: "https://www.packyapi.ai",
-    apiKeyUrl: "https://www.packyapi.ai/register?aff=cc-switch",
-    settingsConfig: {
-      name: "PackyCode",
-      baseUrl: "https://www.packyapi.ai",
-      api: "anthropic-messages",
-      apiKey: "",
-      models: [
-        piModel("anthropic/claude-opus-5.5", {
-          id: "claude-opus-5-5",
-        }),
-        piModel("anthropic/claude-sonnet-5.5", {
-          id: "claude-sonnet-5-5",
-        }),
-        piModel("anthropic/claude-fable-5.1", { id: "claude-fable-5-1" }),
-      ],
-    },
-    category: "third_party",
-    isPartner: true,
-    partnerPromotionKey: "packycode",
-    icon: "packycode",
-  },
-  {
     name: "APINebula",
     providerKey: "cc-switch-apinebula",
     websiteUrl: "https://apinebula.ai",
@@ -744,34 +719,6 @@ const piProviderPresetDefinitions: PiProviderPreset[] = [
     isPartner: true,
     partnerPromotionKey: "apikeyfun",
     icon: "apikeyfun",
-  },
-  {
-    name: "9527CODE",
-    providerKey: "cc-switch-9527-code",
-    websiteUrl: "https://9527.codes",
-    apiKeyUrl: "https://9527.codes/register?aff=e5zI",
-    settingsConfig: {
-      name: "9527CODE",
-      baseUrl: "https://9527.codes",
-      api: "anthropic-messages",
-      apiKey: "",
-      models: [
-        piModel("anthropic/claude-opus-5.5", {
-          id: "claude-opus-5-5",
-        }),
-        piModel("anthropic/claude-sonnet-5.5", {
-          id: "claude-sonnet-5-5",
-        }),
-        piModel("anthropic/claude-haiku-5.5", {
-          id: "claude-haiku-5-5",
-        }),
-        piModel("anthropic/claude-fable-5.1", { id: "claude-fable-5-1" }),
-      ],
-    },
-    category: "aggregator",
-    isPartner: true,
-    partnerPromotionKey: "9527code",
-    icon: "9527code",
   },
   {
     name: "Code0",
