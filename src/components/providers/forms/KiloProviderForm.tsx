@@ -427,8 +427,8 @@ export function KiloProviderForm({
               </p>
             ) : (
               <div className="space-y-2">
-                {extraOptionEntries.map(([key, value]) => (
-                  <div key={key} className="flex items-center gap-2">
+                {extraOptionEntries.map(([key, value], index) => (
+                  <div key={index} className="flex items-center gap-2">
                     <ImeSafeInput
                       value={key.startsWith("option-") ? "" : key}
                       onValueChange={(next) =>

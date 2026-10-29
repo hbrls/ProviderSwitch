@@ -31,6 +31,24 @@ pub(crate) const INPUT_TOKEN_SEMANTICS_LEGACY: i64 = 0;
 pub(crate) const INPUT_TOKEN_SEMANTICS_TOTAL: i64 = 1;
 pub(crate) const INPUT_TOKEN_SEMANTICS_FRESH: i64 = 2;
 
+/// 决定写入 `proxy_request_logs.input_token_semantics` 的值。
+///
+/// - cache-inclusive app（codex/gemini/grokbuild）：TOTAL，input_tokens 已含缓存。
+/// - Claude 系：FRESH，input_tokens 是扣除缓存后的净输入。
+/// - `kilo`：LEGACY，首期不计算或宣称准确的缓存命中率，保留可识别的未知状态，
+///   避免复用公共 logger 入口时被默认标记为 FRESH。
+///
+/// 新增 app 默认落到 FRESH 分支（最安全方向：少计缓存命中比多计更易发现）。
+pub(crate) fn input_token_semantics_for_app(app_type: &str) -> i64 {
+    if app_type == "kilo" {
+        INPUT_TOKEN_SEMANTICS_LEGACY
+    } else if is_cache_inclusive_app(app_type) {
+        INPUT_TOKEN_SEMANTICS_TOTAL
+    } else {
+        INPUT_TOKEN_SEMANTICS_FRESH
+    }
+}
+
 /// Build an SQL expression that returns the cache-normalized `input_tokens`
 /// for a single row in `proxy_request_logs` or `usage_daily_rollups`.
 ///
