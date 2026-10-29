@@ -46,7 +46,7 @@ use super::state::{op, Contract, Mode, ModeState, PendingTarget, StackState};
 
 /// 有路由模式的应用（[`AppType::has_route_mode`]）。Claude Desktop 也在内：它经同一个路由
 /// 服务转发，只是没有故障转移。
-pub const PROXY_APPS: [AppType; 5] = [
+pub const PROXY_APPS: [AppType; 6] = [
     AppType::Claude,
     AppType::Codex,
     AppType::Gemini,
