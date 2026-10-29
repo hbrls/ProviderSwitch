@@ -448,7 +448,15 @@ pub async fn process_response(
     provider_id: &str,
 ) -> Result<Response, ProxyError> {
     if is_sse_response(&response, request_is_stream) {
-        Ok(handle_streaming(response, ctx, state, parser_config, connection_guard).await)
+        Ok(handle_streaming(
+            response,
+            ctx,
+            state,
+            parser_config,
+            connection_guard,
+            provider_id,
+        )
+        .await)
     } else {
         handle_non_streaming(
             response,
