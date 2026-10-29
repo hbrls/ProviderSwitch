@@ -23,6 +23,7 @@ export const APP_IDS: AppId[] = [
   "codex",
   "gemini",
   "grokbuild",
+  "kilo",
   "opencode",
   "openclaw",
   "hermes",
@@ -42,6 +43,7 @@ export const DEFAULT_VISIBLE_APPS: VisibleApps = {
   codex: true,
   gemini: true,
   grokbuild: true,
+  kilo: true,
   opencode: true,
   openclaw: true,
   hermes: true,
@@ -80,7 +82,7 @@ export function orderAppIds(saved: readonly string[] | undefined): AppId[] {
 
 export type ProxyAppId = Extract<
   AppId,
-  "claude" | "codex" | "gemini" | "grokbuild"
+  "claude" | "codex" | "gemini" | "grokbuild" | "kilo"
 >;
 
 /** Apps with a complete local gateway + failover data plane. */
@@ -89,6 +91,7 @@ export const PROXY_APP_IDS: ProxyAppId[] = [
   "codex",
   "gemini",
   "grokbuild",
+  "kilo",
 ];
 
 export function isProxyAppId(appId: string): appId is ProxyAppId {
@@ -134,6 +137,7 @@ export type AdditiveAppId = Extract<
   | "hermes"
   | "pi"
   | "mcode"
+  | "kilo"
   | "kimi"
   | "dsh"
   | "omp"
@@ -181,7 +185,7 @@ export function usesEditorView(appId: AppId): boolean {
 }
 
 /** Claude Desktop、OpenClaw 不由 CC Switch 管理 MCP；Pi 1.0 起内置 MCP（`~/.pi/agent/mcp.json`） */
-export type McpAppId = Exclude<AppId, "claude-desktop" | "openclaw">;
+export type McpAppId = Exclude<AppId, "claude-desktop" | "openclaw" | "kilo">;
 export const MCP_APP_IDS: McpAppId[] = [
   "claude",
   "codex",
@@ -255,6 +259,14 @@ export const APP_ICON_MAP: Record<AppId, AppConfig> = {
     badgeClass:
       "bg-cyan-500/10 text-cyan-700 dark:text-cyan-300 hover:bg-cyan-500/20 border-0 gap-1.5",
   },
+  kilo: {
+    label: "Kilo",
+    icon: <ProviderIcon icon="kilo" name="Kilo" size={14} />,
+    activeClass:
+      "bg-sky-500/10 ring-1 ring-sky-500/20 hover:bg-sky-500/20 text-sky-600 dark:text-sky-400",
+    badgeClass:
+      "bg-sky-500/10 text-sky-700 dark:text-sky-300 hover:bg-sky-500/20 border-0 gap-1.5",
+  },  
   opencode: {
     label: "OpenCode",
     icon: (
