@@ -195,7 +195,10 @@ export function AppsPage() {
   };
   // 两组共用一份顺序（拖动后写进设置，侧栏也按它排），每组只是按装没装过滤
   const appOrder = orderAppIds(settings?.appOrder);
-  const orderedRows = appOrder.map((app) => ROW_BY_APP[app]);
+  // Kilo 尚未接入 CLI 安装管理，在下方单独显示可见性开关。
+  const orderedRows = appOrder
+    .filter((app) => app !== "kilo")
+    .map((app) => ROW_BY_APP[app]);
   const rowStates = orderedRows.map((row) => ({
     row,
     installed: rowInstalled(row),
@@ -551,6 +554,12 @@ export function AppsPage() {
               )}
             </section>
           ))}
+
+          <AppRow
+            app="kilo"
+            name={APP_DISPLAY_NAME.kilo}
+            visibility={visibilitySwitch("kilo")}
+          />
         </div>
       </div>
 
