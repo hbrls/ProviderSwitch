@@ -524,6 +524,7 @@ export function ProviderList({
             isPiFamilyApp(appId) ||
             appId === "mcode" ||
             appId === "kimi" ||
+            appId === "kilo" ||
             appId === "dsh"
               ? undefined
               : () => importMutation.mutate()

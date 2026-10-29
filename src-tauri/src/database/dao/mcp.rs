@@ -104,7 +104,7 @@ impl Database {
             AppType::Copilot => Some("enabled_copilot"),
             AppType::Pi => Some("enabled_pi"),
             AppType::Omp => Some("enabled_omp"),
-            AppType::ClaudeDesktop | AppType::OpenClaw => None,
+            AppType::ClaudeDesktop | AppType::OpenClaw | AppType::Kilo => None,
             AppType::Agy => Some("enabled_agy"),
         };
 
