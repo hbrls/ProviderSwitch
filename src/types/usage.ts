@@ -226,6 +226,7 @@ export type AppType =
   | "codex"
   | "gemini"
   | "grokbuild"
+  | "kilo"
   | "opencode"
   | "pi"
   | "omp"
@@ -241,6 +242,7 @@ export const KNOWN_APP_TYPES: ReadonlyArray<AppType> = [
   "codex",
   "gemini",
   "grokbuild",
+  "kilo",
   "opencode",
   "pi",
   "omp",
