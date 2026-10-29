@@ -508,7 +508,7 @@ mod capability_tests {
     use crate::{
         app_config::{AppType, McpApps, McpServer},
         database::Database,
-        services::{prompt::PromptService, McpService},
+        services::McpService,
         store::AppState,
     };
     use serde_json::json;
@@ -554,56 +554,5 @@ mod capability_tests {
         McpService::upsert_server(&state, server).unwrap();
         crate::mcp::mcode::import(&state).unwrap();
         assert!(!db.get_all_mcp_servers().unwrap()["keep"].apps.mcode);
-        let path = crate::prompt_files::prompt_file_path(&AppType::Mcode).unwrap();
-        fs::write(
-            &path,
-            "For validation, write GLOBAL-INSTRUCTION-OK to global-proof.txt in the project.\n",
-        )
-        .unwrap();
-        let original_instructions = fs::read_to_string(&path).unwrap();
-        let draft = serde_json::from_value(
-            json!({"id":"draft","name":"Draft","content":"Draft instructions","enabled":false}),
-        )
-        .unwrap();
-        PromptService::upsert_prompt(&state, AppType::Mcode, "draft", draft).unwrap();
-        assert_eq!(fs::read_to_string(&path).unwrap(), original_instructions);
-        PromptService::delete_prompt(&state, AppType::Mcode, "draft").unwrap();
-        assert_eq!(
-            PromptService::import_from_file_on_first_launch(&state, AppType::Mcode).unwrap(),
-            1
-        );
-        let prompts = PromptService::get_prompts(&state, AppType::Mcode).unwrap();
-        let (id, prompt) = prompts.first().unwrap();
-        PromptService::enable_prompt(&state, AppType::Mcode, id).unwrap();
-        assert_eq!(fs::read_to_string(&path).unwrap(), prompt.content);
-        let mut oversized = prompt.clone();
-        oversized.id = "oversized".into();
-        oversized.content = "中".repeat(10923);
-        assert!(PromptService::upsert_prompt(
-            &state,
-            AppType::Mcode,
-            "oversized",
-            oversized.clone()
-        )
-        .is_err());
-        assert_eq!(db.get_prompts("mcode").unwrap().len(), 1);
-        oversized.enabled = false;
-        db.save_prompt("mcode", &oversized).unwrap();
-        assert!(PromptService::enable_prompt(&state, AppType::Mcode, "oversized").is_err());
-        assert!(db.get_prompts("mcode").unwrap()[id].enabled);
-        assert!(!db.get_prompts("mcode").unwrap()["oversized"].enabled);
-        db.delete_prompt("mcode", id).unwrap();
-        oversized.enabled = true;
-        db.save_prompt("mcode", &oversized).unwrap();
-        assert!(PromptService::sync_to_live(&state, AppType::Mcode).is_err());
-        assert_eq!(fs::read_to_string(&path).unwrap(), prompt.content);
-        db.delete_prompt("mcode", "oversized").unwrap();
-        db.save_prompt("mcode", prompt).unwrap();
-        let mut disabled = prompt.clone();
-        disabled.enabled = false;
-        PromptService::upsert_prompt(&state, AppType::Mcode, id, disabled).unwrap();
-        assert!(fs::read_to_string(&path).unwrap().is_empty());
-        PromptService::enable_prompt(&state, AppType::Mcode, id).unwrap();
-        assert_eq!(fs::read_to_string(&path).unwrap(), original_instructions);
     }
 }

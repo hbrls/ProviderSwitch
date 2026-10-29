@@ -101,8 +101,6 @@ import { proxyApi } from "@/lib/api/proxy";
 import type { AppMode, StartupAttachFailure } from "@/types/proxy";
 import UsageScriptModal from "@/components/UsageScriptModal";
 import UnifiedMcpPanel from "@/components/mcp/UnifiedMcpPanel";
-import PromptPanel from "@/components/prompts/PromptPanel";
-import { PROMPT_APP_IDS } from "@/lib/query/prompts";
 import { DeepLinkImportDialog } from "@/components/DeepLinkImportDialog";
 import { FirstRunNoticeDialog } from "@/components/FirstRunNoticeDialog";
 import { WhatsNewNotice } from "@/components/WhatsNewDialog";
@@ -172,9 +170,6 @@ function App() {
   const settingsReturnViewRef = useRef<View>("providers");
   const [openclawConfigTab, setOpenclawConfigTab] =
     useState<OpenClawConfigTab>("env");
-  const [promptsApp, setPromptsApp] = useState<AppId>(() =>
-    PROMPT_APP_IDS.includes(sharedFeatureApp) ? sharedFeatureApp : "claude",
-  );
   const [isAddOpen, setIsAddOpen] = useState(false);
   // 供应商搜索面板：页头按钮和 ⌘F 都能打开；换应用或离开供应商页就收起
   const [providerSearchOpen, setProviderSearchOpen] = useState(false);
@@ -201,7 +196,6 @@ function App() {
     nonce: number;
   } | null>(null);
   const [mcpManagementBusy, setMcpManagementBusy] = useState(false);
-  const [promptNavigationBusy, setPromptNavigationBusy] = useState(false);
 
   useEffect(() => {
     storeView(currentView);
@@ -767,7 +761,7 @@ function App() {
   }, [activeApp]);
 
   const currentViewRef = useRef(currentView);
-  const managementBusy = mcpManagementBusy || promptNavigationBusy;
+  const managementBusy = mcpManagementBusy;
   const managementBusyRef = useRef(false);
   managementBusyRef.current = managementBusy;
 
@@ -832,12 +826,6 @@ function App() {
     if (currentViewRef.current === page) return;
     if (confirmLeave(() => openPage(page))) return;
     closeProviderPanels();
-    if (page === "prompts" && currentViewRef.current !== "prompts") {
-      // 提示词页默认选中侧栏里最后选的那个应用
-      setPromptsApp(
-        PROMPT_APP_IDS.includes(sharedFeatureApp) ? sharedFeatureApp : "claude",
-      );
-    }
     setCurrentView(page);
   };
   useTrayAppPageSeen(currentView === "providers" ? activeApp : null);
@@ -1634,22 +1622,6 @@ function App() {
       case "mcp":
         return (
           <UnifiedMcpPanel onInteractionBlockedChange={setMcpManagementBusy} />
-        );
-      case "prompts":
-        return (
-          <div id="main-content" className="flex min-h-0 flex-1 flex-col">
-            <PromptPanel
-              appId={promptsApp}
-              apps={PROMPT_APP_IDS.filter(
-                (app) =>
-                  visibleApps[app] ||
-                  (app === "claude" && visibleApps["claude-desktop"]) ||
-                  app === promptsApp,
-              )}
-              onAppChange={setPromptsApp}
-              onNavigationBlockedChange={setPromptNavigationBusy}
-            />
-          </div>
         );
       case "sessions":
         // 页头（含 ⋯ 菜单）由会话页自己画：菜单里的操作都在页面状态里

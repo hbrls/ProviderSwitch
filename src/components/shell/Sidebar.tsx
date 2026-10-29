@@ -4,7 +4,6 @@ import { useQuery } from "@tanstack/react-query";
 import { getVersion } from "@tauri-apps/api/app";
 import {
   ArrowLeft,
-  BookOpen,
   ChartColumn,
   ChevronsLeft,
   ChevronsRight,
