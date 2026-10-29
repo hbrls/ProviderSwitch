@@ -43,6 +43,7 @@ pub struct VisibleApps {
     #[serde(default = "default_true")]
     pub grokbuild: bool,
     #[serde(default = "default_true")]
+    pub kilo: bool,
     pub opencode: bool,
     #[serde(default = "default_true")]
     pub openclaw: bool,
@@ -68,6 +69,7 @@ impl Default for VisibleApps {
             codex: true,
             gemini: true,
             grokbuild: true,
+            kilo: true,
             opencode: true,
             openclaw: true,
             hermes: false, // 默认不显示，需用户手动启用
@@ -89,6 +91,7 @@ impl VisibleApps {
             AppType::Codex => self.codex,
             AppType::Gemini => self.gemini,
             AppType::GrokBuild => self.grokbuild,
+            AppType::Kilo => self.kilo,
             AppType::OpenCode => self.opencode,
             AppType::OpenClaw => self.openclaw,
             AppType::Hermes => self.hermes,
@@ -363,6 +366,9 @@ pub struct AppSettings {
     /// 当前 Grok Build 供应商 ID（本地存储，优先于数据库 is_current）
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub current_provider_grokbuild: Option<String>,
+    /// 当前 Kilo 供应商 ID（设备级；无效时回退到数据库 is_current）
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub current_provider_kilo: Option<String>,
     /// 当前 OpenCode 供应商 ID（本地存储，对 OpenCode 可能无意义，但保持结构一致）
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub current_provider_opencode: Option<String>,
@@ -468,6 +474,7 @@ impl Default for AppSettings {
             current_provider_codex: None,
             current_provider_gemini: None,
             current_provider_grokbuild: None,
+            current_provider_kilo: None,
             current_provider_opencode: None,
             current_provider_openclaw: None,
             current_provider_hermes: None,
@@ -1114,6 +1121,7 @@ pub fn get_current_provider(app_type: &AppType) -> Option<String> {
         AppType::Codex => settings.current_provider_codex.clone(),
         AppType::Gemini => settings.current_provider_gemini.clone(),
         AppType::GrokBuild => settings.current_provider_grokbuild.clone(),
+        AppType::Kilo => settings.current_provider_kilo.clone(),
         AppType::OpenCode => settings.current_provider_opencode.clone(),
         AppType::OpenClaw => settings.current_provider_openclaw.clone(),
         AppType::Hermes => settings.current_provider_hermes.clone(),
@@ -1134,6 +1142,7 @@ pub fn set_current_provider(app_type: &AppType, id: Option<&str>) -> Result<(), 
         AppType::Codex => settings.current_provider_codex = id_owned.clone(),
         AppType::Gemini => settings.current_provider_gemini = id_owned.clone(),
         AppType::GrokBuild => settings.current_provider_grokbuild = id_owned.clone(),
+        AppType::Kilo => settings.current_provider_kilo = id_owned.clone(),
         AppType::OpenCode => settings.current_provider_opencode = id_owned.clone(),
         AppType::OpenClaw => settings.current_provider_openclaw = id_owned.clone(),
         AppType::Hermes => settings.current_provider_hermes = id_owned.clone(),

@@ -45,6 +45,7 @@ pub async fn stop_proxy_server(state: tauri::State<'_, AppState>) -> Result<(), 
         || takeover.gemini
         || takeover.grokbuild
         || takeover.claude_desktop
+        || takeover.kilo
         || takeover.opencode
         || takeover.openclaw
     {

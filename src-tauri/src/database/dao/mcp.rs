@@ -100,7 +100,7 @@ impl Database {
             AppType::Kimi => Some("enabled_kimi"),
             AppType::Pi => Some("enabled_pi"),
             AppType::Omp => Some("enabled_omp"),
-            AppType::ClaudeDesktop | AppType::OpenClaw => None,
+            AppType::ClaudeDesktop | AppType::OpenClaw | AppType::Kilo => None,
             AppType::Agy => Some("enabled_agy"),
         };
 

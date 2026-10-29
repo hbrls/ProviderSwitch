@@ -313,6 +313,10 @@ impl McpService {
                     &server.server,
                 )?;
             }
+            AppType::Kilo => {
+                // Kilo has no MCP registry in this phase.
+                log::debug!("Kilo MCP sync is not supported, skipping");
+            }            
             AppType::OpenCode => {
                 mcp::sync_single_server_to_opencode(
                     &Default::default(),
@@ -365,6 +369,10 @@ impl McpService {
             AppType::Codex => mcp::remove_server_from_codex(id)?,
             AppType::Gemini => mcp::remove_server_from_gemini(id)?,
             AppType::GrokBuild => mcp::remove_server_from_grokbuild(id)?,
+            AppType::Kilo => {
+                // Kilo has no MCP registry in this phase.
+                log::debug!("Kilo MCP sync is not supported, skipping remove");
+            }
             AppType::OpenCode => {
                 mcp::remove_server_from_opencode(id)?;
             }

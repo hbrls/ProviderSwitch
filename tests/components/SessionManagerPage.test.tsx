@@ -315,6 +315,7 @@ describe("SessionManagerPage", () => {
         codex: true,
         gemini: false,
         grokbuild: false,
+        kilo: false,
         opencode: false,
         openclaw: false,
         hermes: false,

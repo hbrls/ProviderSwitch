@@ -106,6 +106,7 @@ pub async fn get_config_status(
 
             Ok(ConfigStatus { exists, path })
         }
+        AppType::Kilo => Err("NotImplemented: Kilo config is not implemented".to_string()),        
         AppType::OpenCode => {
             let config_path =
                 crate::opencode_config::get_opencode_config_path().map_err(|e| e.to_string())?;
@@ -196,6 +197,7 @@ pub async fn get_config_dir(app: String) -> Result<String, String> {
         AppType::Codex => codex_config::get_codex_config_dir(),
         AppType::Gemini => crate::gemini_config::get_gemini_dir(),
         AppType::GrokBuild => crate::grok_config::get_grok_config_dir(),
+        AppType::Kilo => return Err("NotImplemented: Kilo config is not implemented".to_string()),
         AppType::OpenCode => crate::opencode_config::get_opencode_dir(),
         AppType::OpenClaw => crate::openclaw_config::get_openclaw_dir(),
         AppType::Hermes => crate::hermes_config::get_hermes_dir(),
@@ -222,6 +224,7 @@ pub async fn open_config_folder(handle: AppHandle, app: String) -> Result<bool, 
         AppType::Codex => codex_config::get_codex_config_dir(),
         AppType::Gemini => crate::gemini_config::get_gemini_dir(),
         AppType::GrokBuild => crate::grok_config::get_grok_config_dir(),
+        AppType::Kilo => return Err("NotImplemented: Kilo config is not implemented".to_string()),
         AppType::OpenCode => crate::opencode_config::get_opencode_dir(),
         AppType::OpenClaw => crate::openclaw_config::get_openclaw_dir(),
         AppType::Hermes => crate::hermes_config::get_hermes_dir(),
