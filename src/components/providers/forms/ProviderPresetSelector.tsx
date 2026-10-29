@@ -19,6 +19,7 @@ import type { KimiProviderPreset } from "@/config/kimiProviderPresets";
 import type { CopilotProviderPreset } from "@/config/copilotProviderPresets";
 import type { WorkBuddyProviderPreset } from "@/config/workbuddyProviderPresets";
 import type { PiProviderPreset } from "@/config/piProviderPresets";
+import type { KiloProviderPreset } from "@/config/kiloProviderPresets";
 import type { OmpProviderPreset } from "@/config/ompProviderPresets";
 import type { ProviderCategory } from "@/types";
 import type { AppId } from "@/lib/api";
@@ -70,6 +71,7 @@ export type AnyPreset =
   | ProviderPreset
   | CodexProviderPreset
   | GeminiProviderPreset
+  | KiloProviderPreset
   | ClaudeDesktopProviderPreset
   | OpenCodeProviderPreset
   | OpenClawProviderPreset
