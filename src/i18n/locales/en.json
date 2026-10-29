@@ -1126,7 +1126,8 @@
       "noExtraOptions": "No extra options configured",
       "optionKey": "Option Key",
       "optionValue": "Option Value",
-      "removeOption": "Remove option"
+      "removeOption": "Remove option",
+      "getApiKey": "Get API Key"
     }
   },
   "pi": {

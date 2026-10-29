@@ -13,10 +13,20 @@ import { Textarea } from "@/components/ui/textarea";
 import { ImeSafeInput } from "@/components/ui/ime-safe-input";
 import { RequestHeadersEditor } from "./RequestHeadersEditor";
 import type { ProviderFormProps, ProviderFormValues } from "./ProviderForm";
+import {
+  kiloProviderPresets,
+  type KiloProviderPreset,
+} from "@/config/kiloProviderPresets";
+import { ProviderPresetSelector } from "./ProviderPresetSelector";
 import { resolveKiloModelIcon } from "@/utils/kiloModelIcon";
 import { REQUEST_HEADER_DRAFT_PREFIX } from "./helpers/requestHeaders";
 
 type KiloProviderFormProps = Omit<ProviderFormProps, "appId">;
+
+type KiloPresetEntry = {
+  id: string;
+  preset: KiloProviderPreset;
+};
 
 const DEFAULT_THINKING_TYPE = "enabled";
 const DEFAULT_REASONING_EFFORT = "high";
@@ -169,13 +179,72 @@ export function KiloProviderForm({
   showButtons = true,
 }: KiloProviderFormProps) {
   const { t } = useTranslation();
+  const isEditMode = Boolean(initialData);
   const [formState, setFormState] = useState<KiloFormState>(() =>
     readKiloFormState(initialData),
   );
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [selectedPresetId, setSelectedPresetId] = useState<string | null>(
+    isEditMode ? null : "custom",
+  );
+
+  const presetEntries = useMemo<KiloPresetEntry[]>(
+    () =>
+      kiloProviderPresets.map((preset, index) => ({
+        id: `kilo-${index}`,
+        preset,
+      })),
+    [],
+  );
+
+  const selectedPreset = useMemo(() => {
+    if (!selectedPresetId || selectedPresetId === "custom") return null;
+    return (
+      presetEntries.find((entry) => entry.id === selectedPresetId)?.preset ??
+      null
+    );
+  }, [presetEntries, selectedPresetId]);
+
+  const presetCategoryLabels: Record<string, string> = useMemo(
+    () => ({
+      official: t("providerForm.categoryOfficial", {
+        defaultValue: "官方",
+      }),
+      cn_official: t("providerForm.categoryCnOfficial", {
+        defaultValue: "国内官方",
+      }),
+      aggregator: t("providerForm.categoryAggregation", {
+        defaultValue: "聚合服务",
+      }),
+      third_party: t("providerForm.categoryThirdParty", {
+        defaultValue: "第三方",
+      }),
+    }),
+    [t],
+  );
+
+  const handlePresetChange = useCallback(
+    (value: string) => {
+      setSelectedPresetId(value);
+      if (value === "custom") {
+        setFormState({ ...EMPTY_KILO_FORM });
+        return;
+      }
+      const entry = presetEntries.find((item) => item.id === value);
+      if (!entry) return;
+      setFormState(
+        readKiloFormState({
+          name: entry.preset.name,
+          settingsConfig: { ...entry.preset.settingsConfig },
+        }),
+      );
+    },
+    [presetEntries],
+  );
 
   useEffect(() => {
     setFormState(readKiloFormState(initialData));
+    setSelectedPresetId(initialData ? null : "custom");
   }, [initialData]);
 
   useEffect(() => {
@@ -245,14 +314,23 @@ export function KiloProviderForm({
     const existingIcon = initialData?.icon?.trim() || "";
     const modelIcon = resolveKiloModelIcon(formState.modelId);
     const preservedIcon = existingIcon === "glm" ? "" : existingIcon;
+    const presetIcon = selectedPreset?.icon?.trim() || "";
     const payload: ProviderFormValues = {
       name: formState.providerName.trim(),
-      websiteUrl: "",
+      websiteUrl:
+        selectedPreset?.websiteUrl?.trim() ||
+        initialData?.websiteUrl?.trim() ||
+        "",
       notes: "",
       settingsConfig: JSON.stringify(kiloConfig),
-      icon: modelIcon || preservedIcon,
-      iconColor:
-        modelIcon || !preservedIcon ? "" : initialData?.iconColor?.trim() || "",
+      icon: modelIcon || presetIcon || preservedIcon,
+      iconColor: modelIcon
+        ? ""
+        : presetIcon
+          ? selectedPreset?.iconColor?.trim() || ""
+          : preservedIcon
+            ? initialData?.iconColor?.trim() || ""
+            : "",
     };
 
     setIsSubmitting(true);
@@ -288,6 +366,15 @@ export function KiloProviderForm({
         </section>
 
         <div className="order-1 min-w-0 space-y-6 border-border-default lg:order-2 lg:border-l lg:pl-6">
+          {!isEditMode && (
+            <ProviderPresetSelector
+              selectedPresetId={selectedPresetId}
+              presetEntries={presetEntries}
+              presetCategoryLabels={presetCategoryLabels}
+              onPresetChange={handlePresetChange}
+            />
+          )}
+
           <div className="space-y-2">
             <Label htmlFor="kilo-provider-name">
               {t("kilo.form.providerName", { defaultValue: "Provider Name" })}
@@ -314,9 +401,21 @@ export function KiloProviderForm({
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="kilo-api-key">
-              {t("kilo.form.apiKey", { defaultValue: "API Key" })}
-            </Label>
+            <div className="flex items-center justify-between">
+              <Label htmlFor="kilo-api-key">
+                {t("kilo.form.apiKey", { defaultValue: "API Key" })}
+              </Label>
+              {selectedPreset?.apiKeyUrl && (
+                <a
+                  href={selectedPreset.apiKeyUrl}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="text-xs text-muted-foreground underline-offset-2 hover:underline"
+                >
+                  {t("kilo.form.getApiKey", { defaultValue: "Get API Key" })}
+                </a>
+              )}
+            </div>
             <ImeSafeInput
               id="kilo-api-key"
               type="text"
