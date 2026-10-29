@@ -153,6 +153,16 @@ pub const OPENAI_PARSER_CONFIG: UsageParserConfig = UsageParserConfig {
     app_type_str: "codex",
 };
 
+/// Kilo 使用 OpenAI-compatible Chat Completions 的解析器实现，但统计归属
+/// 必须固定为 kilo，不能复用 Codex 配置中的 app_type 标签。
+pub const KILO_PARSER_CONFIG: UsageParserConfig = UsageParserConfig {
+    stream_parser: TokenUsage::from_openai_stream_events,
+    response_parser: TokenUsage::from_openai_response,
+    model_extractor: openai_model_extractor,
+    stream_event_filter: Some(openai_stream_usage_event_filter),
+    app_type_str: "kilo",
+};
+
 /// Codex 智能解析配置（自动检测 OpenAI 或 Codex 格式）
 pub const CODEX_PARSER_CONFIG: UsageParserConfig = UsageParserConfig {
     stream_parser: TokenUsage::from_codex_stream_events_auto,
