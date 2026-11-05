@@ -173,6 +173,7 @@ impl StreamCheckService {
             AppType::OpenCode => Self::resolve_opencode_base_url(provider),
             AppType::OpenClaw => Self::extract_openclaw_base_url(provider),
             AppType::Hermes => Self::extract_hermes_base_url(provider),
+            AppType::Kilo => Self::extract_kilo_base_url(provider),
             AppType::Pi => crate::pi_config::provider_base_url(&provider.settings_config),
             AppType::Omp => crate::omp_config::provider_base_url(&provider.settings_config),
             AppType::ClaudeDesktop => ClaudeAdapter::new()
@@ -393,6 +394,24 @@ impl StreamCheckService {
             )
         })
     }
+
+    fn extract_kilo_base_url(provider: &Provider) -> Result<String, AppError> {
+        provider
+            .settings_config
+            .get("options")
+            .and_then(|value| value.as_object())
+            .and_then(|options| options.get("baseURL"))
+            .and_then(|value| value.as_str())
+            .map(|value| value.trim().to_string())
+            .filter(|value| !value.is_empty())
+            .ok_or_else(|| {
+                AppError::localized(
+                    "kilo_base_url_missing",
+                    "Kilo 供应商缺少 options.baseURL",
+                    "Kilo provider is missing `options.baseURL`",
+                )
+            })
+    }
 }
 
 #[cfg(test)]
@@ -574,6 +593,25 @@ mod tests {
         assert_eq!(
             StreamCheckService::resolve_opencode_base_url(&p).unwrap(),
             "https://legacy.example/v1"
+        );
+    }
+
+    #[test]
+    fn test_resolve_kilo_base_url_uses_direct_opencode_shape() {
+        let p = make_provider(serde_json::json!({
+            "npm": "@ai-sdk/openai-compatible",
+            "options": {
+                "baseURL": "https://ark.example/api/coding/v3",
+                "apiKey": "secret"
+            },
+            "models": {
+                "glm-5.3": { "name": "GLM-5.3" }
+            }
+        }));
+
+        assert_eq!(
+            StreamCheckService::resolve_base_url(&AppType::Kilo, &p).unwrap(),
+            "https://ark.example/api/coding/v3"
         );
     }
 

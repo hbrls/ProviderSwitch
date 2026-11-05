@@ -103,6 +103,12 @@ pub fn local_direct_pointer(app: &AppType) -> Option<String> {
     crate::settings::get_current_provider(app)
 }
 
+/// 数据库记录的原始直连指针，不使用设备本地记录覆盖。
+/// 用于 Kilo 供应商初始化及删除后的指针修复。
+pub fn database_direct_pointer(db: &Database, app: &AppType) -> Result<Option<String>, AppError> {
+    db.get_current_provider(app.as_str())
+}
+
 /// 删除前检查：直连指针（同 [`provider_for`] 的 `Direct`）或代理路由指着它，就算正在用。
 ///
 /// 和界面上禁用删除的判断是同一个集合。不再单独看 DB 的 `is_current`：本地记录有效时
