@@ -1706,6 +1706,7 @@ pub fn run() {
             commands::fetch_exchange_rates,
             // Stream health check
             commands::stream_check_provider,
+            commands::test_provider_chat,
             // Session manager
             commands::list_sessions,
             commands::get_session_messages,
