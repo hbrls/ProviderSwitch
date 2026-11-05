@@ -1,6 +1,6 @@
 use super::run_db_task;
 use crate::deeplink::{
-    import_mcp_from_deeplink, import_prompt_from_deeplink, import_provider_from_deeplink,
+    import_mcp_from_deeplink, import_provider_from_deeplink,
     parse_deeplink_url, DeepLinkImportRequest, PendingDeepLinkEntry,
 };
 use crate::store::AppState;
@@ -79,14 +79,6 @@ pub async fn import_from_deeplink_unified(
             Ok(serde_json::json!({
                 "type": "provider",
                 "id": provider_id
-            }))
-        }
-        "prompt" => {
-            let prompt_id =
-                import_prompt_from_deeplink(&state, request).map_err(|e| e.to_string())?;
-            Ok(serde_json::json!({
-                "type": "prompt",
-                "id": prompt_id
             }))
         }
         "mcp" => {
