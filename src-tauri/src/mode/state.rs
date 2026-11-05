@@ -71,7 +71,7 @@ pub struct Contract {
 /// 一个应用的模式状态。
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
 pub struct ModeState {
-    /// 没有值：这台设备还没运行过有双模式的版本，启动时按旧版遗留的接管状态定下来。
+    /// 没有值时按直连处理。
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub mode: Option<Mode>,
     /// 客户端文件当前是否指向代理。退出 CC Switch 时分离、下次启动再接上。
