@@ -3,7 +3,6 @@
 //! 此模块提供应用的核心数据存储功能，包括：
 //! - 供应商配置管理
 //! - MCP 服务器配置
-//! - 提示词管理
 //! - Skills 管理
 //! - 通用设置存储
 //!
@@ -18,7 +17,6 @@
 //! └── dao/          - 数据访问对象
 //!     ├── providers.rs
 //!     ├── mcp.rs
-//!     ├── prompts.rs
 //!     ├── skills.rs
 //!     └── settings.rs
 //! ```
@@ -303,12 +301,4 @@ impl Database {
         Ok(count == 0)
     }
 
-    /// 检查提示词表是否为空
-    pub fn is_prompts_table_empty(&self) -> Result<bool, AppError> {
-        let conn = lock_conn!(self.conn);
-        let count: i64 = conn
-            .query_row("SELECT COUNT(*) FROM prompts", [], |row| row.get(0))
-            .map_err(|e| AppError::Database(e.to_string()))?;
-        Ok(count == 0)
-    }
 }
