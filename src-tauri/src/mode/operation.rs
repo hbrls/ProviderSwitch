@@ -435,7 +435,9 @@ pub fn commit_target(
         })?;
     }
     if let Some(mode) = &target.state {
-        mirror_proxy_flag(db, app, mode.is_proxy())?;
+        if app != "kilo" {
+            mirror_proxy_flag(db, app, mode.is_proxy())?;
+        }
     }
     Ok(())
 }
