@@ -189,6 +189,7 @@ impl ProxyService {
                 AppType::Gemini,
                 AppType::GrokBuild,
                 AppType::ClaudeDesktop,
+                AppType::Kilo,
             ]);
         Ok(ProxyTakeoverStatus {
             claude,
@@ -196,6 +197,7 @@ impl ProxyService {
             gemini,
             grokbuild,
             claude_desktop,
+            kilo,
             // OpenCode and OpenClaw don't support proxy features
             opencode: false,
             openclaw: false,
@@ -208,6 +210,12 @@ impl ProxyService {
             server
                 .set_active_target(app_type.as_str(), &provider.id, &provider.name)
                 .await;
+        }
+    }
+
+    pub(crate) async fn clear_active_target(&self, app_type: &AppType) {
+        if let Some(server) = self.server.read().await.as_ref() {
+            server.clear_active_target(app_type.as_str()).await;
         }
     }
 
@@ -325,7 +333,8 @@ impl ProxyService {
             || status.codex
             || status.gemini
             || status.grokbuild
-            || status.claude_desktop)
+            || status.claude_desktop
+            || status.kilo)
     }
 
     fn is_claude_live_taken_over(config: &Value) -> bool {

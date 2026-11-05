@@ -11,7 +11,7 @@ use tauri::Emitter;
 fn require_failover_app(app_type: &str) -> Result<(), String> {
     let app = crate::app_config::AppType::from_str(app_type)
         .map_err(|error| format!("无效的应用类型: {error}"))?;
-    if !app.supports_local_proxy() {
+    if !app.supports_local_proxy() || matches!(app, crate::app_config::AppType::Kilo) {
         return Err(format!("{} 不支持故障转移", app.as_str()));
     }
     Ok(())
@@ -42,6 +42,7 @@ mod tests {
     #[test]
     fn failover_rejects_apps_without_a_proxy_data_plane() {
         assert!(require_failover_app("claude").is_ok());
+        assert!(require_failover_app("kilo").is_err());
         assert!(require_failover_app("pi").is_err());
     }
 
