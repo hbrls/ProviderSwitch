@@ -437,50 +437,6 @@ export const codexProviderPresets: CodexProviderPreset[] = [
     iconColor: "#6366F1",
   },
   {
-    name: "PackyCode",
-    websiteUrl: "https://www.packyapi.ai",
-    apiKeyUrl: "https://www.packyapi.ai/register?aff=cc-switch",
-    category: "third_party",
-    auth: generateThirdPartyAuth(""),
-    config: generateThirdPartyConfig(
-      "packycode",
-      "https://www.packyapi.ai/v1",
-      "gpt-6.1-sol",
-    ),
-    endpointCandidates: [
-      "https://www.packyapi.ai/v1",
-      "https://cf.api.fan/v1",
-      "https://slb-v1.api.fan/v1",
-      "https://www.packyapi.com/v1",
-    ],
-    isPartner: true, // 合作伙伴
-    partnerPromotionKey: "packycode", // 促销信息 i18n key
-    icon: "packycode",
-  },
-  {
-    name: "APINebula",
-    websiteUrl: "https://apinebula.ai",
-    apiKeyUrl: "https://apinebula.ai/VjM74M",
-    category: "third_party",
-    auth: generateThirdPartyAuth(""),
-    config: `model_provider = "custom"
-model = "gpt-6.1-sol"
-review_model = "gpt-6.1-sol"
-model_reasoning_effort = "high"
-disable_response_storage = true
-
-[model_providers.custom]
-name = "APINebula"
-base_url = "https://apinebula.ai/v1"
-wire_api = "responses"
-requires_openai_auth = true`,
-    endpointCandidates: ["https://apinebula.ai/v1"],
-    apiFormat: "openai_responses",
-    isPartner: true,
-    partnerPromotionKey: "apinebula",
-    icon: "apinebula",
-  },
-  {
     name: "AICodeMirror",
     websiteUrl: "https://www.aicodemirror.ai",
     apiKeyUrl: "https://www.aicodemirror.ai/register?invitecode=9915W3",
@@ -938,26 +894,6 @@ requires_openai_auth = true`,
     isPartner: true,
     partnerPromotionKey: "apikeyfun",
     icon: "apikeyfun",
-  },
-  {
-    name: "9527CODE",
-    websiteUrl: "https://9527.codes",
-    apiKeyUrl: "https://9527.codes/register?aff=e5zI",
-    category: "aggregator",
-    auth: generateThirdPartyAuth(""),
-    config: generateThirdPartyConfig(
-      "9527code",
-      "https://9527.codes/v1",
-      "gpt-6.1-sol",
-    ),
-    endpointCandidates: [
-      "https://9527.codes/v1",
-      "https://api.9527.codes/v1",
-      "https://cdn.9527.codes/v1",
-    ],
-    isPartner: true,
-    partnerPromotionKey: "9527code",
-    icon: "9527code",
   },
   {
     name: "Code0",

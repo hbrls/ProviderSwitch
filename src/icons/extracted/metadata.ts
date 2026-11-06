@@ -10,13 +10,6 @@ export const iconMetadata: Record<string, IconMetadata> = {
     keywords: ["88api", "88", "aggregator", "gateway"],
     defaultColor: "currentColor",
   },
-  "9527code": {
-    name: "9527code",
-    displayName: "9527CODE",
-    category: "ai-provider",
-    keywords: ["9527code", "9527", "codes", "aggregator", "relay", "gateway"],
-    defaultColor: "currentColor",
-  },
   a6api: {
     name: "a6api",
     displayName: "A6API",
@@ -70,22 +63,6 @@ export const iconMetadata: Record<string, IconMetadata> = {
       "gemini",
     ],
     defaultColor: "#9C3F00",
-  },
-  apinebula: {
-    name: "apinebula",
-    displayName: "APINebula",
-    category: "ai-provider",
-    shape: "tile",
-    keywords: [
-      "apinebula",
-      "api nebula",
-      "gateway",
-      "relay",
-      "claude",
-      "codex",
-      "gemini",
-    ],
-    defaultColor: "#C86F49",
   },
   atlascloud: {
     name: "atlascloud",
@@ -647,13 +624,6 @@ export const iconMetadata: Record<string, IconMetadata> = {
     category: "ai-provider",
     keywords: ["hermes", "agent", "nous", "nousresearch"],
     defaultColor: "#000000",
-  },
-  packycode: {
-    name: "packycode",
-    displayName: "PackyCode",
-    category: "ai-provider",
-    keywords: ["packycode", "packy", "packyapi"],
-    defaultColor: "currentColor",
   },
   pateway: {
     name: "pateway",
