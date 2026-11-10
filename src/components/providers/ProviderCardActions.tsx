@@ -116,6 +116,23 @@ export function ProviderCardActions({
         {buttons.map((button) => (
           <PrimaryButton key={button.key} button={button} />
         ))}
+        {onTest && (
+          <HoverTip content={t("provider.connectivityCheck")}>
+            <Button
+              variant="quiet"
+              size="icon-compact"
+              aria-label={t("provider.connectivityCheck")}
+              disabled={isTesting}
+              onClick={onTest}
+            >
+              {isTesting ? (
+                <Loader2 className="h-4 w-4 animate-spin" strokeWidth={1.5} />
+              ) : (
+                <Plug className="h-4 w-4" strokeWidth={1.5} />
+              )}
+            </Button>
+          </HoverTip>
+        )}
       </div>
 
       {move && (
@@ -212,18 +229,17 @@ export function ProviderCardActions({
               {t("provider.duplicate")}
             </DropdownMenuItem>
           )}
-          {onTest && (
-            <DropdownMenuItem disabled={isTesting} onSelect={onTest}>
-              {isTesting && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
-              {t("provider.connectivityCheck")}
-            </DropdownMenuItem>
-          )}
           {onConfigureUsage && (
             <DropdownMenuItem onSelect={onConfigureUsage}>
               {t("provider.configureUsage")}
             </DropdownMenuItem>
           )}
-          {(onDuplicate || onTest || onConfigureUsage) && (
+          {onOpenTerminal && (
+            <DropdownMenuItem onSelect={onOpenTerminal}>
+              {t("provider.openTerminal")}
+            </DropdownMenuItem>
+          )}
+          {(onDuplicate || onConfigureUsage || onOpenTerminal) && (
             <DropdownMenuSeparator />
           )}
           <DropdownMenuItem
