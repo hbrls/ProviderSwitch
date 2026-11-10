@@ -6,6 +6,7 @@
 use crate::app_config::AppType;
 use crate::commands::copilot::CopilotAuthState;
 use crate::error::AppError;
+use crate::proxy::kilo::check_provider as kilo_check_provider;
 use crate::services::stream_check::{StreamCheckConfig, StreamCheckResult, StreamCheckService};
 use crate::store::AppState;
 use tauri::State;
@@ -22,6 +23,10 @@ pub async fn stream_check_provider(
     let provider = providers
         .get(&provider_id)
         .ok_or_else(|| AppError::Message(format!("供应商 {provider_id} 不存在")))?;
+
+    if app_type == AppType::Kilo {
+        return kilo_check_provider(provider).await;
+    }
 
     // Copilot 端点是动态的（随 OAuth token 解析），需预先取出 host 再探测；
     // 其余供应商传 None，由服务层从 settings_config 提取 base_url。无需鉴权。
