@@ -29,12 +29,13 @@ serde_json = { version = "1.0", features = ["preserve_order"] }
 serde = { version = "1.0", features = ["derive"] }
 log = "0.4"
 chrono = { version = "0.4", features = ["serde"] }
-tauri = { version = "2.8.2", features = ["tray-icon", "protocol-asset", "image-png", "macos-private-api"] }
-tauri-plugin-log = "2"
+# Keep shared Rust/JS dependencies on matching minor releases in package.json.
+tauri = { version = "~2.10.3", features = ["macos-private-api", "tray-icon", "protocol-asset", "image-png"] }
+tauri-plugin-log = "~2.8.0"
 tauri-plugin-opener = "2"
-tauri-plugin-process = "2"
-tauri-plugin-updater = "2"
-tauri-plugin-dialog = "2"
+tauri-plugin-process = "~2.3.1"
+tauri-plugin-updater = "~2.10.0"
+tauri-plugin-dialog = "~2.6.0"
 tauri-plugin-store = "2"
 tauri-plugin-deep-link = "2"
 tauri-plugin-window-state = "2"
@@ -56,23 +57,20 @@ bytes = "1.5"
 prost = "0.14"
 axum = "0.7"
 tower = "0.4"
-tower-http = { version = "0.5", features = ["cors"] }
 hyper = { version = "1.0", features = ["full"] }
 hyper-util = { version = "0.1", features = ["tokio", "http1", "client-legacy"] }
-hyper-rustls = { version = "0.27", features = ["http1", "tls12", "ring", "webpki-tokio"] }
+# Use ring consistently; TLS crates' defaults also enable the native AWS-LC build.
+hyper-rustls = { version = "0.27", default-features = false, features = ["http1", "tls12", "ring", "webpki-tokio", "native-tokio", "logging"] }
 http = "1"
-http-body = "1"
 http-body-util = "0.1"
 httparse = "1"
-tokio-rustls = "0.26"
-rustls = "0.23"
+tokio-rustls = { version = "0.26", default-features = false, features = ["ring", "logging", "tls12"] }
+rustls = { version = "0.23", default-features = false, features = ["ring", "logging", "std", "tls12"] }
 webpki-roots = "0.26"
 rustls-native-certs = "0.8"
 regex = "1.10"
 rquickjs = { version = "0.8", features = ["array-buffer", "classes"] }
 thiserror = "2.0"
-anyhow = "1.0"
-zip = "2.2"
 serde_yaml = "0.9"
 tempfile = "3"
 url = "2.5"
@@ -128,6 +126,14 @@ objc2-06 = { package = "objc2", version = "0.6" }
 objc2-foundation-03 = { package = "objc2-foundation", version = "0.3", default-features = false, features = ["std", "NSArray", "NSGeometry", "NSString"] }
 objc2-app-kit-03 = { package = "objc2-app-kit", version = "0.3", default-features = false, features = ["std", "NSAppearance", "NSGlassEffectView", "NSGraphics", "NSResponder", "NSScreen", "NSView", "NSVisualEffectView", "NSWindow"] }
 
+# Agent 为主的工作流：不打断点，只依赖 panic backtrace 的文件名+行号定位失败
+[profile.dev]
+debug = "line-tables-only"
+
+# 依赖开优化加速测试执行；自身 crate 保持 opt-level = 0 以保留增量编译速度
+[profile.dev.package."*"]
+opt-level = 2
+
 # Optimize release binary size to help reduce AppImage footprint
 [profile.release]
 # 主 crate 体量大，codegen-units = 1 时 LLVM 只能单线程跑，发布编译的大头都在它身上。
@@ -138,6 +144,12 @@ opt-level = "s"
 # 使用 unwind 以便 panic hook 能捕获 backtrace（abort 会直接终止无法捕获）
 panic = "unwind"
 strip = "symbols"
+
+# Rust 1.95 / macOS 下 strip=symbols 生成的宏库会触发 dyld 的 LINKEDIT
+# string pool 未对齐错误（rustc 报 E0463）。仅构建依赖保留符号；它们不随
+# 应用分发，也不生成完整调试信息，最终发布产物仍按上面的配置剥离。
+[profile.release.build-override]
+strip = "none"
 
 [dev-dependencies]
 serial_test = "3"
