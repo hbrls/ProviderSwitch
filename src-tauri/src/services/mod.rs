@@ -32,7 +32,6 @@ pub mod session_usage_grokbuild;
 pub mod session_usage_omp;
 pub mod session_usage_opencode;
 pub mod session_usage_pi;
-pub mod skill;
 pub mod speedtest;
 pub mod sql_helpers;
 pub mod stream_check;
@@ -52,8 +51,6 @@ pub use omo::OmoService;
 pub use prompt::PromptService;
 pub use provider::{ProviderService, ProviderSortUpdate, SwitchResult};
 pub use proxy::ProxyService;
-#[allow(unused_imports)]
-pub use skill::{DiscoverableSkill, Skill, SkillRepo, SkillService};
 pub use speedtest::{EndpointLatency, SpeedtestService};
 pub use usage_cache::UsageCache;
 #[allow(unused_imports)]

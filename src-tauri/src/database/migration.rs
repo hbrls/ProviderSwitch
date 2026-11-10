@@ -203,7 +203,24 @@ impl Database {
         // - 或后续启动时的自动扫描逻辑
         // 来重建已安装技能记录。
 
-        for repo in &config.skills.repos {
+        // Skills 功能已移除，`config.skills` 仅为兼容占位（Option<Value>）；
+        // 旧配置里若仍带 repos 列表，照常迁入 skill_repos 表。
+        #[derive(serde::Deserialize)]
+        struct LegacySkillRepo {
+            owner: String,
+            name: String,
+            branch: String,
+            enabled: bool,
+        }
+
+        let legacy_repos: Vec<LegacySkillRepo> = config
+            .skills
+            .as_ref()
+            .and_then(|skills| skills.get("repos"))
+            .and_then(|repos| serde_json::from_value(repos.clone()).ok())
+            .unwrap_or_default();
+
+        for repo in &legacy_repos {
             tx.execute(
                 "INSERT OR REPLACE INTO skill_repos (owner, name, branch, enabled) VALUES (?1, ?2, ?3, ?4)",
                 params![repo.owner, repo.name, repo.branch, repo.enabled],
