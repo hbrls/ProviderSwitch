@@ -18,6 +18,7 @@ export interface KiloPresetSettingsConfig {
   options: {
     baseURL: string;
     apiKey: string;
+    proxy?: string;
     headers?: Record<string, string>;
     [key: string]: unknown;
   };

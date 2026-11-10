@@ -30,12 +30,46 @@ type KiloPresetEntry = {
 
 const DEFAULT_THINKING_TYPE = "enabled";
 const DEFAULT_REASONING_EFFORT = "high";
-const RESERVED_OPTION_KEYS = new Set(["baseURL", "apiKey", "headers"]);
+const RESERVED_OPTION_KEYS = new Set(["baseURL", "apiKey", "headers", "proxy"]);
+
+const PROXY_RESERVED_KEYS = ["baseURL", "apiKey", "headers", "proxy"];
+
+type ProxyValidationError =
+  | "invalidUrl"
+  | "unsupportedScheme"
+  | "missingHost"
+  | "noUserInfo"
+  | "noQuery"
+  | "noFragment"
+  | "noPath"
+  | "invalidPort";
+
+function validateProxyUrl(raw: string): ProxyValidationError | null {
+  const trimmed = raw.trim();
+  if (!trimmed) return null;
+  let url: URL;
+  try {
+    url = new URL(trimmed);
+  } catch {
+    return "invalidUrl";
+  }
+  if (url.protocol !== "http:" && url.protocol !== "https:") {
+    return "unsupportedScheme";
+  }
+  if (!url.hostname) return "missingHost";
+  if (url.username || url.password) return "noUserInfo";
+  if (url.search) return "noQuery";
+  if (url.hash) return "noFragment";
+  if (url.pathname !== "/") return "noPath";
+  if (url.port && !/^\d+$/.test(url.port)) return "invalidPort";
+  return null;
+}
 
 type KiloFormState = {
   providerName: string;
   baseUrl: string;
   apiKey: string;
+  proxy: string;
   headers: Record<string, string>;
   extraOptions: Record<string, string>;
   modelId: string;
@@ -50,6 +84,7 @@ const EMPTY_KILO_FORM: KiloFormState = {
   providerName: "",
   baseUrl: "",
   apiKey: "",
+  proxy: "",
   headers: {},
   extraOptions: {},
   modelId: "",
@@ -106,10 +141,11 @@ function readKiloFormState(
     extraOptions: Object.fromEntries(
       Object.entries(options).filter(
         ([key, value]) =>
-          !["baseURL", "apiKey", "headers"].includes(key) &&
+          !PROXY_RESERVED_KEYS.includes(key) &&
           typeof value === "string",
       ),
     ) as Record<string, string>,
+    proxy: typeof options.proxy === "string" ? options.proxy : "",
     modelId,
     modelName: typeof model?.name === "string" ? model.name : modelId,
     thinkingType:
@@ -131,6 +167,7 @@ export function buildKiloSettingsConfig(
   const options: Record<string, unknown> = {
     baseURL: params.baseUrl.trim(),
     apiKey: params.apiKey.trim(),
+    proxy: params.proxy.trim(),
   };
 
   const headers = Object.fromEntries(
@@ -271,6 +308,11 @@ export function KiloProviderForm({
     [kiloConfig],
   );
 
+  const proxyError = useMemo(
+    () => validateProxyUrl(formState.proxy),
+    [formState.proxy],
+  );
+
   const extraOptionEntries = Object.entries(formState.extraOptions);
 
   const handleAddExtraOption = () => {
@@ -306,7 +348,8 @@ export function KiloProviderForm({
       !formState.providerName.trim() ||
       !formState.modelId.trim() ||
       !formState.thinkingType.trim() ||
-      !formState.reasoningEffort.trim()
+      !formState.reasoningEffort.trim() ||
+      proxyError
     ) {
       return;
     }
@@ -398,6 +441,46 @@ export function KiloProviderForm({
               placeholder="https://ark.cn-beijing.volces.com/api/coding/v3"
               required
             />
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="kilo-proxy">
+              {t("kilo.form.proxy", { defaultValue: "HTTP/HTTPS Proxy" })}
+            </Label>
+            <ImeSafeInput
+              id="kilo-proxy"
+              value={formState.proxy}
+              onValueChange={(value) => updateField("proxy", value)}
+              placeholder="http://127.0.0.1:7890"
+              aria-invalid={proxyError ? "true" : undefined}
+              aria-describedby="kilo-proxy-error"
+            />
+            {proxyError && (
+              <p
+                id="kilo-proxy-error"
+                className="text-xs text-destructive"
+                role="alert"
+              >
+                {t(`kilo.form.proxyError.${proxyError}`, {
+                  defaultValue:
+                    proxyError === "invalidUrl"
+                      ? "Proxy must be a valid http(s) URL, e.g. http://127.0.0.1:7890"
+                      : proxyError === "unsupportedScheme"
+                        ? "Proxy scheme must be http or https"
+                        : proxyError === "missingHost"
+                          ? "Proxy is missing a host"
+                          : proxyError === "noUserInfo"
+                            ? "Proxy URL must not contain a username or password"
+                            : proxyError === "noQuery"
+                              ? "Proxy URL must not contain a query string"
+                              : proxyError === "noFragment"
+                                ? "Proxy URL must not contain a fragment"
+                                : proxyError === "noPath"
+                                  ? "Proxy URL must use the root path"
+                                  : "Proxy port must be numeric",
+                })}
+              </p>
+            )}
           </div>
 
           <div className="space-y-2">
