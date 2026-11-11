@@ -2797,6 +2797,18 @@ impl RequestForwarder {
             let uri: http::Uri = url.parse().map_err(|e| {
                 ProxyError::ForwardFailed(format!("Invalid upstream URL ({target_for_log}): {e}"))
             })?;
+            // Claude Desktop Routing uses only the current request's Provider proxy.
+            // Missing/blank values mean direct connection; global proxy state is untouched.
+            let provider_proxy_url = if matches!(app_type, AppType::ClaudeDesktop) {
+                provider
+                    .meta
+                    .as_ref()
+                    .and_then(|meta| meta.claude_desktop_proxy_url.as_deref())
+                    .map(str::trim)
+                    .filter(|value| !value.is_empty())
+            } else {
+                upstream_proxy_url.as_deref()
+            };
             super::hyper_client::send_request(
                 uri,
                 &target_for_log,
@@ -2805,7 +2817,7 @@ impl RequestForwarder {
                 extensions.clone(),
                 body_bytes,
                 timeout,
-                upstream_proxy_url.as_deref(),
+                provider_proxy_url,
             )
             .await?
         };

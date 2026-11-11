@@ -84,6 +84,24 @@ export type ClaudeDesktopProviderFormValues = ProviderFormData & {
 
 type ApiKeyField = "ANTHROPIC_AUTH_TOKEN" | "ANTHROPIC_API_KEY";
 
+function isValidProxyUrl(value: string): boolean {
+  if (!value.trim()) return true;
+  try {
+    const url = new URL(value.trim());
+    return (
+      (url.protocol === "http:" || url.protocol === "https:") &&
+      Boolean(url.hostname) &&
+      !url.username &&
+      !url.password &&
+      !url.search &&
+      !url.hash &&
+      url.pathname === "/"
+    );
+  } catch {
+    return false;
+  }
+}
+
 type PresetEntry = {
   id: string;
   preset: ClaudeDesktopProviderPreset;
@@ -279,6 +297,10 @@ export function ClaudeDesktopProviderForm({
     envString(initialData?.settingsConfig, "ANTHROPIC_AUTH_TOKEN") ||
       envString(initialData?.settingsConfig, "ANTHROPIC_API_KEY"),
   );
+  const [proxyUrl, setProxyUrl] = useState(
+    initialData?.meta?.claudeDesktopProxyUrl ?? "",
+  );
+  const proxyUrlInvalid = !isValidProxyUrl(proxyUrl);
   const [apiKeyField, setApiKeyField] = useState<ApiKeyField>(() =>
     envString(initialData?.settingsConfig, "ANTHROPIC_API_KEY")
       ? "ANTHROPIC_API_KEY"
@@ -728,6 +750,7 @@ export function ClaudeDesktopProviderForm({
       const meta: ProviderMeta = { ...(initialData?.meta ?? {}) };
       delete meta.claudeDesktopMode;
       delete meta.claudeDesktopModelRoutes;
+      delete meta.claudeDesktopProxyUrl;
       delete meta.apiFormat;
       delete meta.claudeReasoningEffort;
       delete meta.endpointAutoSelect;
@@ -744,6 +767,7 @@ export function ClaudeDesktopProviderForm({
       });
       return;
     }
+    if (proxyUrlInvalid) return;
     if (!baseUrl.trim() && !usesManagedOAuth) {
       toast.error(
         t("providerForm.fetchModelsNeedEndpoint", {
@@ -935,6 +959,11 @@ export function ClaudeDesktopProviderForm({
     };
 
     meta.claudeDesktopModelRoutes = routeMap;
+    if (proxyUrl.trim()) {
+      meta.claudeDesktopProxyUrl = proxyUrl.trim();
+    } else {
+      delete meta.claudeDesktopProxyUrl;
+    }
     if (
       effectiveMode === "proxy" &&
       (meta.apiFormat === "openai_chat" ||
@@ -1111,6 +1140,38 @@ export function ClaudeDesktopProviderForm({
               }
               showManageButton={false}
             />
+
+            <div className="space-y-2">
+              <Label htmlFor="claude-desktop-provider-proxy">
+                {t("claudeDesktop.proxyUrlLabel", {
+                  defaultValue: "HTTP/HTTPS Proxy",
+                })}
+              </Label>
+              <Input
+                id="claude-desktop-provider-proxy"
+                value={proxyUrl}
+                onChange={(event) => setProxyUrl(event.target.value)}
+                placeholder="http://127.0.0.1:7890"
+                aria-invalid={proxyUrlInvalid || undefined}
+                aria-describedby={
+                  proxyUrlInvalid
+                    ? "claude-desktop-provider-proxy-error"
+                    : undefined
+                }
+              />
+              {proxyUrlInvalid && (
+                <p
+                  id="claude-desktop-provider-proxy-error"
+                  className="text-xs text-destructive"
+                  role="alert"
+                >
+                  {t("claudeDesktop.proxyUrlInvalid", {
+                    defaultValue:
+                      "Enter an HTTP/HTTPS proxy address, e.g. http://127.0.0.1:7890",
+                  })}
+                </p>
+              )}
+            </div>
 
             <div className="space-y-4 border-l border-border pl-3">
               <div className="flex items-stretch justify-between gap-4">
