@@ -300,6 +300,8 @@
   },
   "claudeDesktop": {
     "modelConfigTitle": "模型配置",
+    "proxyUrlLabel": "HTTP/HTTPS 代理",
+    "proxyUrlInvalid": "请输入 HTTP/HTTPS 代理地址，例如 http://127.0.0.1:7890",
     "modelModeLabel": "接入方式",
     "modelModeDirect": "直连",
     "modelModeProxy": "模型映射",

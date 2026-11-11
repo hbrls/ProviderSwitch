@@ -300,6 +300,8 @@
   },
   "claudeDesktop": {
     "modelConfigTitle": "Model Configuration",
+    "proxyUrlLabel": "HTTP/HTTPS Proxy",
+    "proxyUrlInvalid": "Enter an HTTP/HTTPS proxy address, e.g. http://127.0.0.1:7890",
     "modelModeLabel": "Connection Mode",
     "modelModeDirect": "Direct",
     "modelModeProxy": "Model Mapping",
