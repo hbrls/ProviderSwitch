@@ -515,6 +515,12 @@ pub struct ProviderMeta {
         skip_serializing_if = "HashMap::is_empty"
     )]
     pub claude_desktop_model_routes: HashMap<String, ClaudeDesktopModelRoute>,
+    /// Claude Desktop Routing provider's upstream HTTP/HTTPS proxy.
+    #[serde(
+        rename = "claudeDesktopProxyUrl",
+        skip_serializing_if = "Option::is_none"
+    )]
+    pub claude_desktop_proxy_url: Option<String>,
     /// 用量查询脚本配置
     #[serde(skip_serializing_if = "Option::is_none")]
     pub usage_script: Option<UsageScript>,
