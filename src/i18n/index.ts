@@ -3,12 +3,7 @@ import { initReactI18next } from "react-i18next";
 
 import de from "./locales/de.json";
 import en from "./locales/en.json";
-import ja from "./locales/ja.json";
-import ko from "./locales/ko.json";
-import ru from "./locales/ru.json";
-import tr from "./locales/tr.json";
 import zh from "./locales/zh.json";
-import zhTW from "./locales/zh-TW.json";
 import { isLanguage, languageFromLocale, type Language } from "./languages";
 
 const getInitialLanguage = (): Language => {
@@ -33,21 +28,11 @@ const getInitialLanguage = (): Language => {
 };
 
 const resources = {
-  de: { translation: de },
-  ko: { translation: ko },
-  ru: { translation: ru },
-  tr: { translation: tr },
   en: {
     translation: en,
   },
-  ja: {
-    translation: ja,
-  },
   zh: {
     translation: zh,
-  },
-  "zh-TW": {
-    translation: zhTW,
   },
 };
 
@@ -55,6 +40,7 @@ i18n.use(initReactI18next).init({
   resources,
   lng: getInitialLanguage(), // 根据本地存储或系统语言选择默认语言
   fallbackLng: "en", // 如果缺少中文翻译则退回英文
+  supportedLngs: ["zh", "en"],
 
   interpolation: {
     escapeValue: false, // React 已经默认转义
