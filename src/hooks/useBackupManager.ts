@@ -76,14 +76,8 @@ export function useBackupLocations() {
 
   const deleteMutation = useMutation({
     mutationFn: (id: string) => backupsApi.deleteBackupLocation(id),
-    onSuccess: async (_freed, id) => {
+    onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: BACKUP_LOCATIONS_KEY });
-      // Skills 页的备份列表与这里删的是同一个目录
-      if (id === "skills") {
-        await queryClient.invalidateQueries({
-          queryKey: ["skills", "backups"],
-        });
-      }
     },
   });
 
