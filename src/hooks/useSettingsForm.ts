@@ -15,6 +15,7 @@ export type SettingsFormState = Omit<Settings, "language"> & {
   language: Language;
 };
 
+// 严格校验：只接受精确的 zh / en，其他值一律回退默认语言
 const normalizeLanguage = (lang?: string | null): Language => {
   if (!lang) return DEFAULT_LANGUAGE;
   const normalized = normalizeLanguageTag(lang);
@@ -59,8 +60,8 @@ export function useSettingsForm(): UseSettingsFormResult {
   const readPersistedLanguage = useCallback((): Language => {
     if (typeof window !== "undefined") {
       const stored = window.localStorage.getItem("language");
-      if (isSupportedLanguage(stored)) {
-        return normalizeLanguage(stored);
+      if (stored === "zh" || stored === "en") {
+        return stored;
       }
     }
     return normalizeLanguage(i18n.language);
