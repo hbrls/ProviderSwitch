@@ -3,62 +3,15 @@ import { useTranslation } from "react-i18next";
 import { useSettingsQuery } from "@/lib/query";
 import type { Settings } from "@/types";
 
-type Language = "zh" | "zh-TW" | "en" | "ja" | "tr" | "ko" | "ru";
+type Language = "zh" | "en";
 
 export type SettingsFormState = Omit<Settings, "language"> & {
   language: Language;
 };
 
+// 严格校验：只接受精确的 zh / en，其他值一律回退默认语言
 const normalizeLanguage = (lang?: string | null): Language => {
-  if (!lang) return "zh";
-  const normalized = lang.toLowerCase().replace(/_/g, "-");
-
-  if (normalized === "zh") {
-    return "zh";
-  }
-
-  if (
-    normalized === "zh-tw" ||
-    normalized.startsWith("zh-tw-") ||
-    normalized === "zh-hant" ||
-    normalized.startsWith("zh-hant-") ||
-    normalized === "zh-hk" ||
-    normalized.startsWith("zh-hk-") ||
-    normalized === "zh-mo" ||
-    normalized.startsWith("zh-mo-")
-  ) {
-    return "zh-TW";
-  }
-
-  if (
-    normalized === "en" ||
-    normalized === "ja" ||
-    normalized === "tr" ||
-    normalized === "ko" ||
-    normalized === "ru"
-  ) {
-    return normalized;
-  }
-
-  if (normalized === "zh" || normalized.startsWith("zh-")) {
-    return "zh";
-  }
-
-  return "zh";
-};
-
-const isSupportedLanguage = (lang?: string | null): boolean => {
-  if (!lang) return false;
-  const normalized = lang.toLowerCase().replace(/_/g, "-");
-  return (
-    normalized === "en" ||
-    normalized === "ja" ||
-    normalized === "tr" ||
-    normalized === "ko" ||
-    normalized === "ru" ||
-    normalized === "zh" ||
-    normalized.startsWith("zh-")
-  );
+  return lang === "zh" || lang === "en" ? lang : "zh";
 };
 
 const sanitizeDir = (value?: string | null): string | undefined => {
@@ -98,8 +51,8 @@ export function useSettingsForm(): UseSettingsFormResult {
   const readPersistedLanguage = useCallback((): Language => {
     if (typeof window !== "undefined") {
       const stored = window.localStorage.getItem("language");
-      if (isSupportedLanguage(stored)) {
-        return normalizeLanguage(stored);
+      if (stored === "zh" || stored === "en") {
+        return stored;
       }
     }
     return normalizeLanguage(i18n.language);

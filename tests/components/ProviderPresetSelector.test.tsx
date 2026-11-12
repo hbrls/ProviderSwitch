@@ -37,10 +37,7 @@ import {
   PRESET_REGION_KEYS,
 } from "@/config/presetFamilies";
 import zh from "@/i18n/locales/zh.json";
-import zhTW from "@/i18n/locales/zh-TW.json";
 import en from "@/i18n/locales/en.json";
-import ja from "@/i18n/locales/ja.json";
-import tr from "@/i18n/locales/tr.json";
 
 vi.mock("@/components/ProviderIcon", () => ({
   ProviderIcon: ({ name }: { name: string }) => (
@@ -370,15 +367,15 @@ describe("preset families", () => {
         "nameKey" in info ? [info.nameKey] : [],
       ),
     ];
-    for (const locale of [zh, zhTW, en, ja]) {
+    for (const locale of [zh, en]) {
       for (const key of keys) {
         expect(typeof lookup(locale, key), key).toBe("string");
       }
     }
   });
 
-  it("has a label and a hint for every category in all four locales", () => {
-    for (const [name, locale] of Object.entries({ zh, zhTW, en, ja })) {
+  it("has a label and a hint for every category in supported locales", () => {
+    for (const [name, locale] of Object.entries({ zh, en })) {
       const { group, groupHint } = locale.providerPreset as unknown as Record<
         "group" | "groupHint",
         Record<string, unknown>
@@ -512,7 +509,7 @@ describe("ProviderPresetSelector", () => {
     expect(
       within(host).queryByText("providerPreset.loginWith.claude"),
     ).not.toBeInTheDocument();
-    for (const locale of [zh, zhTW, en, ja, tr]) {
+    for (const locale of [zh, en]) {
       expect(
         (locale.providerPreset.loginWith as Record<string, string>).deepseek,
       ).toContain("DeepSeek");

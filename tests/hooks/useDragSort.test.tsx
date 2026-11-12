@@ -73,37 +73,6 @@ describe("useDragSort", () => {
     consoleErrorSpy.mockRestore();
   });
 
-  it.each([
-    ["ko", ["가나다", "나무", "Alpha"]],
-    ["ko-KR", ["가나다", "나무", "Alpha"]],
-    ["kok-IN", ["Alpha", "가나다", "나무"]],
-  ])(
-    "uses the appropriate provider-name collation for %s",
-    async (language, expected) => {
-      const previousLanguage = i18n.language;
-      await i18n.changeLanguage(language);
-      try {
-        const { wrapper } = createWrapper();
-        const providers = Object.fromEntries(
-          ["Alpha", "나무", "가나다"].map((name) => [
-            name,
-            { id: name, name, settingsConfig: {} },
-          ]),
-        );
-        const { result, unmount } = renderHook(
-          () => useDragSort(providers, "claude"),
-          { wrapper },
-        );
-        expect(result.current.sortedProviders.map((item) => item.name)).toEqual(
-          expected,
-        );
-        unmount();
-      } finally {
-        await i18n.changeLanguage(previousLanguage);
-      }
-    },
-  );
-
   it("should sort providers by sortIndex, createdAt, and name", () => {
     const { wrapper } = createWrapper();
 

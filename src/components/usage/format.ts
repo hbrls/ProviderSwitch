@@ -441,31 +441,10 @@ function normalizeLanguageTag(language: string): string {
   return language.toLowerCase().replace(/_/g, "-");
 }
 
-function isTraditionalChineseLanguage(normalizedLanguage: string): boolean {
-  return (
-    normalizedLanguage === "zh-tw" ||
-    normalizedLanguage.startsWith("zh-tw-") ||
-    normalizedLanguage === "zh-hant" ||
-    normalizedLanguage.startsWith("zh-hant-") ||
-    normalizedLanguage === "zh-hk" ||
-    normalizedLanguage.startsWith("zh-hk-") ||
-    normalizedLanguage === "zh-mo" ||
-    normalizedLanguage.startsWith("zh-mo-")
-  );
-}
-
 export function getLocaleFromLanguage(language: string): string {
   if (!language) return "en-US";
   const normalized = normalizeLanguageTag(language);
-  if (normalized === "zh") return "zh-CN";
-  if (isTraditionalChineseLanguage(normalized)) {
-    return "zh-TW";
-  }
-  if (normalized === "zh" || normalized.startsWith("zh-")) return "zh-CN";
-  if (normalized === "ja" || normalized.startsWith("ja-")) return "ja-JP";
-  if (normalized === "ko" || normalized.startsWith("ko-")) return "ko-KR";
-  if (normalized === "tr" || normalized.startsWith("tr-")) return "tr-TR";
-  if (normalized === "ru" || normalized.startsWith("ru-")) return "ru-RU";
+  if (normalized.startsWith("zh")) return "zh-CN";
   return "en-US";
 }
 
@@ -513,25 +492,10 @@ export function formatTokensShort(
   if (!Number.isFinite(value) || value <= 0) return "0";
   const decimals = compactDecimals;
   const normalizedLang = normalizeLanguageTag(lang);
-  if (isTraditionalChineseLanguage(normalizedLang)) {
-    if (value >= 1e8) return `${(value / 1e8).toFixed(2)} 億`;
-    if (value >= 1e4) return `${(value / 1e4).toFixed(decimals)} 萬`;
-    return value.toLocaleString("zh-TW");
-  }
-  if (
-    normalizedLang === "zh" ||
-    normalizedLang.startsWith("zh-") ||
-    normalizedLang === "ja" ||
-    normalizedLang.startsWith("ja-")
-  ) {
+  if (normalizedLang.startsWith("zh")) {
     if (value >= 1e8) return `${(value / 1e8).toFixed(2)} 亿`;
     if (value >= 1e4) return `${(value / 1e4).toFixed(decimals)} 万`;
     return value.toLocaleString();
-  }
-  if (normalizedLang === "ko" || normalizedLang.startsWith("ko-")) {
-    if (value >= 1e8) return `${(value / 1e8).toFixed(2)}억`;
-    if (value >= 1e4) return `${(value / 1e4).toFixed(decimals)}만`;
-    return value.toLocaleString("ko-KR");
   }
   if (value >= 1e9) return `${(value / 1e9).toFixed(2)}B`;
   if (value >= 1e6) return `${(value / 1e6).toFixed(2)}M`;

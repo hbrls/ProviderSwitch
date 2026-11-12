@@ -2,25 +2,14 @@ import i18n from "i18next";
 import { initReactI18next } from "react-i18next";
 
 import en from "./locales/en.json";
-import ja from "./locales/ja.json";
-import ko from "./locales/ko.json";
-import ru from "./locales/ru.json";
-import tr from "./locales/tr.json";
 import zh from "./locales/zh.json";
-import zhTW from "./locales/zh-TW.json";
 
-type Language = "zh" | "zh-TW" | "en" | "ja" | "tr" | "ko" | "ru";
+type Language = "zh" | "en";
 
 const DEFAULT_LANGUAGE: Language = "zh";
 
 const isLanguage = (value: unknown): value is Language =>
-  value === "zh" ||
-  value === "zh-TW" ||
-  value === "en" ||
-  value === "ja" ||
-  value === "tr" ||
-  value === "ko" ||
-  value === "ru";
+  value === "zh" || value === "en";
 
 const getInitialLanguage = (): Language => {
   if (typeof window !== "undefined") {
@@ -40,44 +29,11 @@ const getInitialLanguage = (): Language => {
         navigator.languages?.[0]?.toLowerCase())
       : undefined;
 
-  if (navigatorLang === "zh") {
+  if (navigatorLang?.startsWith("zh")) {
     return "zh";
   }
 
-  if (
-    navigatorLang === "zh-tw" ||
-    navigatorLang?.startsWith("zh-tw-") ||
-    navigatorLang === "zh-hk" ||
-    navigatorLang?.startsWith("zh-hk-") ||
-    navigatorLang === "zh-mo" ||
-    navigatorLang?.startsWith("zh-mo-") ||
-    navigatorLang === "zh-hant" ||
-    navigatorLang?.startsWith("zh-hant-")
-  ) {
-    return "zh-TW";
-  }
-
-  if (navigatorLang === "zh" || navigatorLang?.startsWith("zh-")) {
-    return "zh";
-  }
-
-  if (navigatorLang === "ja" || navigatorLang?.startsWith("ja-")) {
-    return "ja";
-  }
-
-  if (navigatorLang === "ko" || navigatorLang?.startsWith("ko-")) {
-    return "ko";
-  }
-
-  if (navigatorLang === "tr" || navigatorLang?.startsWith("tr-")) {
-    return "tr";
-  }
-
-  if (navigatorLang === "ru" || navigatorLang?.startsWith("ru-")) {
-    return "ru";
-  }
-
-  if (navigatorLang === "en" || navigatorLang?.startsWith("en-")) {
+  if (navigatorLang?.startsWith("en")) {
     return "en";
   }
 
@@ -86,20 +42,11 @@ const getInitialLanguage = (): Language => {
 };
 
 const resources = {
-  ko: { translation: ko },
-  ru: { translation: ru },
-  tr: { translation: tr },
   en: {
     translation: en,
   },
-  ja: {
-    translation: ja,
-  },
   zh: {
     translation: zh,
-  },
-  "zh-TW": {
-    translation: zhTW,
   },
 };
 
@@ -107,6 +54,7 @@ i18n.use(initReactI18next).init({
   resources,
   lng: getInitialLanguage(), // 根据本地存储或系统语言选择默认语言
   fallbackLng: "en", // 如果缺少中文翻译则退回英文
+  supportedLngs: ["zh", "en"],
 
   interpolation: {
     escapeValue: false, // React 已经默认转义

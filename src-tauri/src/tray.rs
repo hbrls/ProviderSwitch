@@ -157,30 +157,10 @@ pub struct TrayTexts {
 /// 区域为空时回退到 `zh`（与前端默认一致）。
 fn map_locale_to_tray_language(locale: &str) -> &'static str {
     let locale = locale.to_lowercase();
-    if locale == "zh" {
+    if locale.starts_with("zh") {
         "zh"
-    } else if locale == "zh-tw"
-        || locale.starts_with("zh-tw-")
-        || locale == "zh-hk"
-        || locale.starts_with("zh-hk-")
-        || locale == "zh-mo"
-        || locale.starts_with("zh-mo-")
-        || locale == "zh-hant"
-        || locale.starts_with("zh-hant-")
-    {
-        "zh-TW"
-    } else if locale == "zh" || locale.starts_with("zh-") {
-        "zh"
-    } else if locale == "ja" || locale.starts_with("ja-") {
-        "ja"
-    } else if locale == "ko" || locale.starts_with("ko-") {
-        "ko"
-    } else if locale == "tr" || locale.starts_with("tr-") {
-        "tr"
-    } else if locale == "ru" || locale.starts_with("ru-") {
-        "ru"
-    } else if locale.is_empty() {
-        "zh"
+    } else if locale.starts_with("en") {
+        "en"
     } else {
         "en"
     }
@@ -251,278 +231,6 @@ impl TrayTexts {
                 reset_on_date: "{label} quota resets {when}",
                 reset_at_time: "{label} quota resets at {when}",
                 date_format: "%b %-d",
-                quota_used: false,
-            },
-            "ko" => Self {
-                show_main: "CC Switch 열기",
-                open_website: "공식 웹사이트 열기",
-                lightweight_mode: "경량 모드",
-                quit: "CC Switch 종료",
-                quit_stops_routing: "CC Switch 종료 (라우팅 서비스 중지)",
-                projects_label: "프로젝트",
-                no_project_label: "프로젝트 없음",
-                header_direct: "직접 연결",
-                header_route: "라우팅",
-                header_failover: "라우팅 · 장애 조치 켜짐",
-                header_stack: "통합 · 기본 공급자",
-                header_stack_default: "통합 · 기본값: {name}",
-                failover_note: "대기열에서 자동으로 선택됩니다. 앱 페이지에서 변경하세요",
-                mode_route: "라우팅",
-                mode_stack: "통합",
-                needs_routing_suffix: " (라우팅 필요)…",
-                official_blocked_suffix: " (공식 요금제는 라우팅을 사용하지 않음)",
-                open_app_page: "{app} 페이지 열기",
-                add_provider: "공급자 추가…",
-                almost_out: "거의 소진됨",
-                needs_attention: "확인 필요",
-                problem_service_down: "라우팅 서비스가 실행 중이 아닙니다 (포트 {port})",
-                problem_attach_failed: "{app}: 이전 {mode} 연결에 실패하여 직접 연결로 돌아갔습니다",
-                problem_switch_failed: "{app} 전환 실패: {reason}",
-                problem_more: "문제 {count}개 더 있음 — CC Switch에서 확인하세요",
-                tooltip_problem: "CC Switch · 확인 필요: {problem}",
-                feedback_switched: "{app}의 공급자가 {name}(으)로 전환되었습니다. 적용하려면 {app}을(를) 다시 시작하세요",
-                feedback_stack_default: "{app}의 기본 공급자가 {name}(으)로 변경되었습니다. 적용하려면 {app}을(를) 다시 시작하세요",
-                feedback_profile: "{app}에 {name} 프로젝트를 적용했습니다",
-                tier_five_hour: "5시간",
-                tier_weekly: "주간",
-                tier_fable: "Fable",
-                tier_monthly: "월간",
-                tier_thirty_day: "30일",
-                tier_credits: "크레딧",
-                tier_gemini_pro: "Pro",
-                tier_gemini_flash: "Flash",
-                tier_gemini_flash_lite: "Flash Lite",
-                tier_premium: "프리미엄 요청",
-                tier_left: "{label} {value}% 남음",
-                tier_used: "{label} {value}% 사용",
-                tier_used_up: "{label} 소진됨",
-                balance: "잔액 {value}",
-                plan_expired: "요금제 만료됨",
-                used_amount: "{value} 사용",
-                quota_failed: "할당량 조회 실패",
-                quota_failed_login_expired: "할당량 조회 실패: 로그인 만료",
-                quota_failed_token_refresh_pending: "할당량 조회 실패: 토큰 갱신 대기 중",
-                reset_on_date: "{when}에 {label} 할당량 초기화",
-                reset_at_time: "{when}에 {label} 할당량 초기화",
-                date_format: "%-m월 %-d일",
-                quota_used: false,
-            },
-            "ru" => Self {
-                show_main: "Открыть CC Switch",
-                open_website: "Открыть официальный сайт",
-                lightweight_mode: "Облегчённый режим",
-                quit: "Выйти из CC Switch",
-                quit_stops_routing: "Выйти из CC Switch (служба маршрутизации остановится)",
-                projects_label: "Проекты",
-                no_project_label: "Без проекта",
-                header_direct: "Напрямую",
-                header_route: "Маршрутизация",
-                header_failover: "Маршрутизация · резервное переключение включено",
-                header_stack: "Агрегация · провайдер по умолчанию",
-                header_stack_default: "Агрегация · по умолчанию: {name}",
-                failover_note: "Выбирается из очереди автоматически; изменить можно на странице приложения",
-                mode_route: "Маршрутизация",
-                mode_stack: "Агрегация",
-                needs_routing_suffix: " (нужна маршрутизация)…",
-                official_blocked_suffix: " (официальные планы не идут через маршрутизацию)",
-                open_app_page: "Открыть страницу {app}",
-                add_provider: "Добавить провайдера…",
-                almost_out: "почти исчерпано",
-                needs_attention: "требует внимания",
-                problem_service_down: "Служба маршрутизации не запущена (порт {port})",
-                problem_attach_failed: "{app}: не удалось переподключить {mode} при запуске; включено прямое подключение",
-                problem_switch_failed: "{app} не переключился: {reason}",
-                problem_more: "Ещё проблем: {count} — откройте CC Switch, чтобы посмотреть",
-                tooltip_problem: "CC Switch · Требует внимания: {problem}",
-                feedback_switched: "{app} переключён на {name}. Перезапустите {app}, чтобы применить",
-                feedback_stack_default: "Провайдер по умолчанию для {app} теперь {name}. Перезапустите {app}, чтобы применить",
-                feedback_profile: "Проект \u{00ab}{name}\u{00bb} применён к {app}",
-                tier_five_hour: "5 часов",
-                tier_weekly: "Неделя",
-                tier_fable: "Fable",
-                tier_monthly: "Месяц",
-                tier_thirty_day: "30 дней",
-                tier_credits: "Кредиты",
-                tier_gemini_pro: "Pro",
-                tier_gemini_flash: "Flash",
-                tier_gemini_flash_lite: "Flash Lite",
-                tier_premium: "Credits",
-                tier_left: "{label}: осталось {value}%",
-                tier_used: "{label}: использовано {value}%",
-                tier_used_up: "{label}: исчерпано",
-                balance: "Баланс {value}",
-                plan_expired: "Срок плана истёк",
-                used_amount: "Использовано {value}",
-                quota_failed: "Квота недоступна",
-                quota_failed_login_expired: "Квота недоступна: срок входа истёк",
-                quota_failed_token_refresh_pending: "Квота недоступна: ожидается обновление токена",
-                reset_on_date: "Квота {label} сбросится {when}",
-                reset_at_time: "Квота {label} сбросится в {when}",
-                date_format: "%d.%m",
-                quota_used: false,
-            },
-            "tr" => Self {
-                show_main: "CC Switch'i aç",
-                open_website: "Resmî web sitesini aç",
-                lightweight_mode: "Hafif mod",
-                quit: "CC Switch'ten çık",
-                quit_stops_routing: "CC Switch'ten çık (yönlendirme hizmeti durur)",
-                projects_label: "Projeler",
-                no_project_label: "Proje yok",
-                header_direct: "Doğrudan",
-                header_route: "Yönlendirme",
-                header_failover: "Yönlendirme · Yedek sağlayıcıya geçiş açık",
-                header_stack: "Birleştirme · Varsayılan sağlayıcı",
-                header_stack_default: "Birleştirme · Varsayılan: {name}",
-                failover_note: "Kuyruktan otomatik seçilir; uygulama sayfasından değiştirebilirsiniz",
-                mode_route: "Yönlendirme",
-                mode_stack: "Birleştirme",
-                needs_routing_suffix: " (yönlendirme gerekir)…",
-                official_blocked_suffix: " (resmî abonelikler yönlendirmeyi kullanmaz)",
-                open_app_page: "{app} sayfasını aç",
-                add_provider: "Sağlayıcı ekle…",
-                almost_out: "bitmek üzere",
-                needs_attention: "ilgilenilmesi gerekiyor",
-                problem_service_down: "Yönlendirme hizmeti çalışmıyor (port {port})",
-                problem_attach_failed: "{app}: {mode} başlangıçta yeniden bağlanamadı; doğrudan bağlantıya dönüldü",
-                problem_switch_failed: "{app} geçiş yapamadı: {reason}",
-                problem_more: "{count} sorun daha var — görmek için CC Switch'i açın",
-                tooltip_problem: "CC Switch · İlgilenilmesi gerekiyor: {problem}",
-                feedback_switched: "{app}, {name} sağlayıcısına geçti. Uygulamak için {app} uygulamasını yeniden başlatın",
-                feedback_stack_default: "{app} için varsayılan sağlayıcı artık {name}. Uygulamak için {app} uygulamasını yeniden başlatın",
-                feedback_profile: "{name} projesi {app} uygulamasına uygulandı",
-                tier_five_hour: "5 saatlik",
-                tier_weekly: "Haftalık",
-                tier_fable: "Fable",
-                tier_monthly: "Aylık",
-                tier_thirty_day: "30 günlük",
-                tier_credits: "Krediler",
-                tier_gemini_pro: "Pro",
-                tier_gemini_flash: "Flash",
-                tier_gemini_flash_lite: "Flash Lite",
-                tier_premium: "Credits",
-                tier_left: "{label} %{value} kaldı",
-                tier_used: "{label} %{value} kullanıldı",
-                tier_used_up: "{label} tükendi",
-                balance: "Bakiye {value}",
-                plan_expired: "Planın süresi doldu",
-                used_amount: "Kullanılan: {value}",
-                quota_failed: "Kota bilgisi alınamıyor",
-                quota_failed_login_expired: "Kota bilgisi alınamıyor: oturumun süresi doldu",
-                quota_failed_token_refresh_pending: "Kota bilgisi alınamıyor: token yenilenmesi bekleniyor",
-                reset_on_date: "{label} kotası {when} tarihinde sıfırlanır",
-                reset_at_time: "{label} kotası {when} saatinde sıfırlanır",
-                date_format: "%d.%m",
-                quota_used: false,
-            },
-            "ja" => Self {
-                show_main: "CC Switch を開く",
-                open_website: "公式サイトを開く",
-                lightweight_mode: "軽量モード",
-                quit: "CC Switch を終了",
-                quit_stops_routing: "CC Switch を終了（ルーティングサービスが停止します）",
-                projects_label: "プロジェクト",
-                no_project_label: "プロジェクトを使用しない",
-                header_direct: "直接接続",
-                header_route: "ルーティング",
-                header_failover: "ルーティング · フェイルオーバー有効",
-                header_stack: "集約 · デフォルトのプロバイダー",
-                header_stack_default: "集約 · デフォルト：{name}",
-                failover_note: "キューの順に自動で選ばれます（変更はアプリのページで）",
-                mode_route: "ルーティング",
-                mode_stack: "集約",
-                needs_routing_suffix: "（ルーティングが必要）…",
-                official_blocked_suffix: "（公式サブスクリプションはルーティングを通りません）",
-                open_app_page: "{app} のページを開く",
-                add_provider: "プロバイダーを追加…",
-                almost_out: "残りわずか",
-                needs_attention: "対応が必要",
-                problem_service_down: "ルーティングサービスが動いていません（ポート {port}）",
-                problem_attach_failed: "{app}：前回の{mode}に再接続できず、直接接続に戻りました",
-                problem_switch_failed: "{app} を切り替えられませんでした：{reason}",
-                problem_more:
-                    "ほかに {count} 件の問題があります。CC Switch を開いて確認してください",
-                tooltip_problem: "CC Switch · 対応が必要：{problem}",
-                feedback_switched:
-                    "{app} を {name} に切り替えました。反映するには {app} を再起動してください",
-                feedback_stack_default: "{app} のデフォルトのプロバイダーを {name} に変更しました。反映するには {app} を再起動してください",
-                feedback_profile: "プロジェクト「{name}」を {app} に適用しました",
-                tier_five_hour: "5時間",
-                tier_weekly: "週間",
-                tier_fable: "Fable",
-                tier_monthly: "月間",
-                tier_thirty_day: "30日間",
-                tier_credits: "クレジット",
-                tier_gemini_pro: "Pro",
-                tier_gemini_flash: "Flash",
-                tier_gemini_flash_lite: "Flash Lite",
-                tier_premium: "Credits",
-                tier_left: "{label} 残り {value}%",
-                tier_used: "{label} 使用済み {value}%",
-                tier_used_up: "{label} 使い切り",
-                balance: "残高 {value}",
-                plan_expired: "プラン期限切れ",
-                used_amount: "使用 {value}",
-                quota_failed: "残量を取得できません",
-                quota_failed_login_expired: "残量を取得できません：ログインの期限切れ",
-                quota_failed_token_refresh_pending: "残量を取得できません：トークンの更新待ち",
-                reset_on_date: "{label}の枠は {when} にリセット",
-                reset_at_time: "{label}の枠は {when} にリセット",
-                date_format: "%-m月%-d日",
-                quota_used: false,
-            },
-            "zh-TW" => Self {
-                show_main: "開啟 CC Switch",
-                open_website: "開啟官方網站",
-                lightweight_mode: "輕量模式",
-                quit: "退出 CC Switch",
-                quit_stops_routing: "退出 CC Switch（路由服務會停止）",
-                projects_label: "專案",
-                no_project_label: "不使用專案",
-                header_direct: "直連",
-                header_route: "路由",
-                header_failover: "路由 · 故障轉移開啟中",
-                header_stack: "聚合 · 預設供應商",
-                header_stack_default: "聚合 · 預設 {name}",
-                failover_note: "依佇列自動選擇，要調整請到應用頁",
-                mode_route: "路由",
-                mode_stack: "聚合",
-                needs_routing_suffix: "（需要路由）…",
-                official_blocked_suffix: "（官方訂閱不經過路由）",
-                open_app_page: "開啟 {app} 頁面",
-                add_provider: "新增供應商…",
-                almost_out: "快用完",
-                needs_attention: "需要處理",
-                problem_service_down: "路由服務沒在執行（連接埠 {port}）",
-                problem_attach_failed: "{app}：上次的{mode}沒能接上，已回到直連",
-                problem_switch_failed: "{app} 沒切換成功：{reason}",
-                problem_more: "還有 {count} 個問題，開啟 CC Switch 查看",
-                tooltip_problem: "CC Switch · 需要處理：{problem}",
-                feedback_switched: "{app} 已切換到 {name}，重新啟動 {app} 後生效",
-                feedback_stack_default: "{app} 的預設供應商改為 {name}，重新啟動 {app} 後生效",
-                feedback_profile: "已把專案「{name}」套用到 {app}",
-                tier_five_hour: "5 小時",
-                tier_weekly: "每週",
-                tier_fable: "Fable",
-                tier_monthly: "每月",
-                tier_thirty_day: "30 天",
-                tier_credits: "額度",
-                tier_gemini_pro: "Pro",
-                tier_gemini_flash: "Flash",
-                tier_gemini_flash_lite: "Flash Lite",
-                tier_premium: "Credits",
-                tier_left: "{labelSp}剩餘 {value}%",
-                tier_used: "{labelSp}已用 {value}%",
-                tier_used_up: "{labelSp}已用完",
-                balance: "餘額 {value}",
-                plan_expired: "方案已過期",
-                used_amount: "已使用 {value}",
-                quota_failed: "額度查詢失敗",
-                quota_failed_login_expired: "額度查詢失敗：登入已過期",
-                quota_failed_token_refresh_pending: "額度查詢失敗：權杖待重新整理",
-                reset_on_date: "{labelSp}額度 {when}重置",
-                reset_at_time: "{labelSp}額度 {when} 重置",
-                date_format: "%-m 月 %-d 日",
                 quota_used: false,
             },
             _ => Self {
@@ -3562,7 +3270,7 @@ mod tests {
     }
 
     #[test]
-    fn locale_maps_traditional_chinese_variants_to_zh_tw() {
+    fn locale_maps_traditional_chinese_variants_to_zh() {
         for locale in [
             "zh-TW",
             "zh-HK",
@@ -3573,8 +3281,8 @@ mod tests {
         ] {
             assert_eq!(
                 map_locale_to_tray_language(locale),
-                "zh-TW",
-                "expected {locale} -> zh-TW"
+                "zh",
+                "expected {locale} -> zh"
             );
         }
     }
@@ -3591,47 +3299,7 @@ mod tests {
     }
 
     #[test]
-    fn locale_matches_language_and_chinese_region_boundaries() {
-        for locale in ["zha", "zhb-CN", "jam", "trv-TW"] {
-            assert_eq!(map_locale_to_tray_language(locale), "en", "{locale}");
-        }
-        for locale in ["zh-TW-u-nu-hanidec", "zh-Hant-TW", "zh-HK"] {
-            assert_eq!(map_locale_to_tray_language(locale), "zh-TW", "{locale}");
-        }
-        for locale in ["zh-hantx", "zh-hkx"] {
-            assert_eq!(map_locale_to_tray_language(locale), "zh", "{locale}");
-        }
-    }
-
-    #[test]
-    fn locale_maps_korean_without_matching_other_language_subtags() {
-        for locale in ["ko", "ko-KR", "ko-KP", "KO-kr"] {
-            assert_eq!(map_locale_to_tray_language(locale), "ko");
-        }
-        for locale in ["kok", "kok-IN", "kos"] {
-            assert_eq!(map_locale_to_tray_language(locale), "en");
-        }
-    }
-
-    #[test]
-    fn locale_maps_russian_without_matching_other_language_subtags() {
-        for locale in ["ru", "ru-RU", "ru-UA", "RU-ru"] {
-            assert_eq!(map_locale_to_tray_language(locale), "ru");
-        }
-        // 卢森尼亚语 rue、Rupuni 等以 ru 开头但不是俄语，按不支持的语言回落英文
-        for locale in ["rue", "rue-UA", "rup"] {
-            assert_eq!(map_locale_to_tray_language(locale), "en");
-        }
-    }
-
-    #[test]
-    fn locale_maps_japanese_and_english() {
-        assert_eq!(map_locale_to_tray_language("ko-KR"), "ko");
-        assert_eq!(map_locale_to_tray_language("ko"), "ko");
-        assert_eq!(map_locale_to_tray_language("tr-TR"), "tr");
-        assert_eq!(map_locale_to_tray_language("tr"), "tr");
-        assert_eq!(map_locale_to_tray_language("ja-JP"), "ja");
-        assert_eq!(map_locale_to_tray_language("ja"), "ja");
+    fn locale_maps_english() {
         assert_eq!(map_locale_to_tray_language("en-US"), "en");
         assert_eq!(map_locale_to_tray_language("en"), "en");
     }
@@ -3657,16 +3325,18 @@ mod tests {
             ("直连", "路由", "聚合")
         );
         assert_eq!(zh.header_failover, "路由 · 故障转移开启中");
-        let tw = TrayTexts::from_language("zh-TW");
-        assert_eq!((tw.header_direct, tw.mode_stack), ("直連", "聚合"));
         let en = en();
         assert_eq!(
             (en.header_direct, en.mode_route, en.mode_stack),
             ("Direct", "Routing", "Aggregation")
         );
-        let ja = TrayTexts::from_language("ja");
-        assert_eq!(ja.mode_route, "ルーティング");
-        for texts in [zh, tw, en, ja] {
+        for language in ["zh-TW", "ja", "de", ""] {
+            let texts = TrayTexts::from_language(language);
+            assert_eq!(texts.header_direct, zh.header_direct, "{language}");
+            assert_eq!(texts.mode_route, zh.mode_route, "{language}");
+            assert_eq!(texts.mode_stack, zh.mode_stack, "{language}");
+        }
+        for texts in [zh, en] {
             // 托盘不用 emoji 表达状态（Windows 菜单里彩色 emoji 会变成单色轮廓）。
             for text in [
                 texts.almost_out,
@@ -3749,11 +3419,6 @@ mod tests {
         assert_eq!(
             title(format_subscription_quota(&en(), &quota)),
             Some(("5-hour 69% left · Weekly 5% left".to_string(), true))
-        );
-        let tw = TrayTexts::from_language("zh-TW");
-        assert_eq!(
-            sub_title(&tw, &quota).as_deref(),
-            Some("5 小時剩餘 69% · 每週剩餘 5%")
         );
     }
 
@@ -4899,7 +4564,7 @@ mod tests {
             quit_text(&en(), true),
             "Quit CC Switch (stops the routing service)"
         );
-        for language in ["zh", "zh-TW", "en", "ja", "tr", "ko", "ru"] {
+        for language in ["zh", "en"] {
             let texts = TrayTexts::from_language(language);
             assert_ne!(texts.quit, texts.quit_stops_routing, "{language}");
             assert!(
