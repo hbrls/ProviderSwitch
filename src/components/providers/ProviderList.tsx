@@ -22,6 +22,7 @@ import { toast } from "@/lib/toast";
 import type { OpenClawProviderConfig, Provider } from "@/types";
 import { getOpencodeDeclaredModels } from "@/components/providers/forms/helpers/opencodeFormUtils";
 import type { AppId } from "@/lib/api";
+import type { StreamCheckResult } from "@/lib/api/connectivity-check";
 import { providersApi } from "@/lib/api/providers";
 import {
   extractErrorMessage,
@@ -219,7 +220,7 @@ export function ProviderList({
 
   const handleTest = useCallback(
     (provider: Provider) => {
-      checkProvider(provider.id, provider.name);
+      return checkProvider(provider.id);
     },
     [checkProvider],
   );
@@ -730,7 +731,7 @@ interface SortableProviderCardProps {
   onConfigureUsage: (provider: Provider) => void;
   onOpenWebsite: (url: string) => void;
   onOpenTerminal?: (provider: Provider) => void;
-  onTest?: (provider: Provider) => void;
+  onTest?: (provider: Provider) => Promise<StreamCheckResult | null> | void;
   isTesting: boolean;
 }
 
