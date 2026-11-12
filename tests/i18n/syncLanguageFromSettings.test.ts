@@ -18,20 +18,13 @@ describe("syncLanguageFromSettings", () => {
   });
 
   it("overrides a stale cached language", async () => {
-    await i18n.changeLanguage("ja");
-    localStorage.setItem("language", "ja");
+    await i18n.changeLanguage("zh");
+    localStorage.setItem("language", "zh");
 
-    syncLanguageFromSettings("zh-TW");
+    syncLanguageFromSettings("en");
 
-    expect(i18n.language).toBe("zh-TW");
-    expect(localStorage.getItem("language")).toBe("zh-TW");
-  });
-
-  it("restores Turkish and its translated labels from saved settings", async () => {
-    await i18n.changeLanguage("en");
-    syncLanguageFromSettings("tr");
-    expect(i18n.language).toBe("tr");
-    expect(localStorage.getItem("language")).toBe("tr");
+    expect(i18n.language).toBe("en");
+    expect(localStorage.getItem("language")).toBe("en");
   });
 
   it("leaves the current language alone when nothing is saved", async () => {
@@ -39,6 +32,10 @@ describe("syncLanguageFromSettings", () => {
 
     syncLanguageFromSettings(undefined);
     syncLanguageFromSettings("fr");
+    syncLanguageFromSettings("tr");
+    syncLanguageFromSettings("ko");
+    syncLanguageFromSettings("ru");
+    syncLanguageFromSettings("zh-TW");
 
     expect(i18n.language).toBe("en");
     expect(localStorage.getItem("language")).toBeNull();

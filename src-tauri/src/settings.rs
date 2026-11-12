@@ -896,7 +896,7 @@ impl AppSettings {
             .language
             .as_ref()
             .map(|s| s.trim())
-            .filter(|s| matches!(*s, "en" | "zh" | "zh-TW" | "de" | "ja" | "tr" | "ko" | "ru"))
+            .filter(|s| matches!(*s, "en" | "zh"))
             .map(|s| s.to_string());
 
         self.quota_display = self
@@ -1704,26 +1704,6 @@ pub fn update_s3_sync_status(status: WebDavSyncStatus) -> Result<(), AppError> {
 mod tests {
     use super::*;
     use crate::app_config::AppType;
-
-    #[test]
-    fn russian_language_survives_normalization() {
-        let mut settings = AppSettings {
-            language: Some("ru".into()),
-            ..Default::default()
-        };
-        settings.normalize_paths();
-        assert_eq!(settings.language.as_deref(), Some("ru"));
-    }
-
-    #[test]
-    fn korean_language_survives_normalization() {
-        let mut settings = AppSettings {
-            language: Some("ko".into()),
-            ..Default::default()
-        };
-        settings.normalize_paths();
-        assert_eq!(settings.language.as_deref(), Some("ko"));
-    }
 
     #[test]
     fn codex_stack_classic_tools_default_on_and_ignore_the_old_off_key() {
