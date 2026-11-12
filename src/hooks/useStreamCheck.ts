@@ -1,6 +1,4 @@
 import { useState, useCallback } from "react";
-import { toast } from "@/lib/toast";
-import { useTranslation } from "react-i18next";
 import {
   streamCheckProvider,
   type StreamCheckResult,
@@ -15,64 +13,15 @@ import type { AppId } from "@/lib/api";
  * 不应被误判为"健康"而切回线上。熔断器只由真实转发流量驱动（见 proxy/forwarder.rs）。
  */
 export function useStreamCheck(appId: AppId) {
-  const { t } = useTranslation();
   const [checkingIds, setCheckingIds] = useState<Set<string>>(new Set());
 
   const checkProvider = useCallback(
-    async (
-      providerId: string,
-      providerName: string,
-    ): Promise<StreamCheckResult | null> => {
+    async (providerId: string): Promise<StreamCheckResult | null> => {
       setCheckingIds((prev) => new Set(prev).add(providerId));
 
       try {
-        const result = await streamCheckProvider(appId, providerId);
-
-        if (result.status === "operational") {
-          toast.success(
-            t("streamCheck.reachable", {
-              providerName: providerName,
-              responseTimeMs: result.responseTimeMs,
-              defaultValue: `${providerName} 连通正常 (${result.responseTimeMs}ms)`,
-            }),
-            { closeButton: true },
-          );
-        } else if (result.status === "degraded") {
-          toast.warning(
-            t("streamCheck.reachableSlow", {
-              providerName: providerName,
-              responseTimeMs: result.responseTimeMs,
-              defaultValue: `${providerName} 连通但较慢 (${result.responseTimeMs}ms)`,
-            }),
-          );
-        } else {
-          // 仅当无法建立连接（DNS / 连接被拒 / TLS / 超时）才会到这里
-          toast.error(
-            t("streamCheck.unreachable", {
-              providerName: providerName,
-              message: result.message,
-              defaultValue: `${providerName} 无法连通: ${result.message}`,
-            }),
-            {
-              description: t("streamCheck.unreachableHint", {
-                defaultValue:
-                  "无法建立连接（DNS / 连接 / TLS / 超时）。请检查 base_url 与网络。",
-              }),
-              duration: 8000,
-              closeButton: true,
-            },
-          );
-        }
-
-        return result;
-      } catch (e) {
-        toast.error(
-          t("streamCheck.error", {
-            providerName: providerName,
-            error: String(e),
-            defaultValue: `${providerName} 检查出错: ${String(e)}`,
-          }),
-        );
+        return await streamCheckProvider(appId, providerId);
+      } catch {
         return null;
       } finally {
         setCheckingIds((prev) => {
@@ -82,7 +31,7 @@ export function useStreamCheck(appId: AppId) {
         });
       }
     },
-    [appId, t],
+    [appId],
   );
 
   const isChecking = useCallback(
