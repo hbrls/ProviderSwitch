@@ -14,13 +14,7 @@ export type AppPage =
   | "openclawConfig"
   | "hermesMemory";
 
-export type GlobalPage =
-  | "usage"
-  | "auth"
-  | "mcp"
-  | "prompts"
-  | "sessions"
-  | "apps";
+export type GlobalPage = "usage" | "auth" | "mcp" | "sessions" | "apps";
 
 export type View = AppPage | GlobalPage | "settings";
 
@@ -48,14 +42,7 @@ const APP_PAGES: AppPage[] = [
   "hermesMemory",
 ];
 
-const GLOBAL_PAGES: GlobalPage[] = [
-  "usage",
-  "auth",
-  "mcp",
-  "prompts",
-  "sessions",
-  "apps",
-];
+const GLOBAL_PAGES: GlobalPage[] = ["usage", "auth", "mcp", "sessions", "apps"];
 
 export const VIEW_STORAGE_KEY = "cc-switch-last-view";
 export const APP_STORAGE_KEY = "cc-switch-last-app";
