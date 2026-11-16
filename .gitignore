@@ -6,7 +6,6 @@ release/
 .env
 .env.local
 *.tsbuildinfo
-.npmrc
 CLAUDE.md
 AGENTS.md
 GEMINI.md
