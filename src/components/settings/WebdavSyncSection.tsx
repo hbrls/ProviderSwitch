@@ -1599,7 +1599,6 @@ export function WebdavSyncSection({
                 <p>{t("settings.webdavSync.confirmUpload.content")}</p>
                 <ul className="list-disc pl-5 space-y-1 text-fg-2">
                   <li>{t("settings.webdavSync.confirmUpload.dbItem")}</li>
-                  <li>{t("settings.webdavSync.confirmUpload.skillsItem")}</li>
                 </ul>
                 <p className="text-fg-2">
                   {t("settings.webdavSync.confirmUpload.targetPath")}
@@ -1760,7 +1759,6 @@ export function WebdavSyncSection({
                 <p>{t("settings.s3Sync.confirmUpload.content")}</p>
                 <ul className="list-disc pl-5 space-y-1 text-fg-2">
                   <li>{t("settings.s3Sync.confirmUpload.dbItem")}</li>
-                  <li>{t("settings.s3Sync.confirmUpload.skillsItem")}</li>
                 </ul>
                 <p className="text-fg-2">
                   {t("settings.s3Sync.confirmUpload.targetPath")}

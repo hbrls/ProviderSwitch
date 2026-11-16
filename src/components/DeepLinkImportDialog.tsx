@@ -21,7 +21,6 @@ import { useTranslation } from "react-i18next";
 import { useQueryClient } from "@tanstack/react-query";
 import { PromptConfirmation } from "./deeplink/PromptConfirmation";
 import { McpConfirmation } from "./deeplink/McpConfirmation";
-import { SkillConfirmation } from "./deeplink/SkillConfirmation";
 import { ProviderIcon } from "./ProviderIcon";
 import {
   classifyEndpoint,
@@ -330,22 +329,6 @@ export function DeepLinkImportDialog() {
           });
         } else if (result.type === "mcp") {
           await refreshMcp(result);
-        } else if (result.type === "skill") {
-          // Refresh Skills with aggressive strategy
-          queryClient.invalidateQueries({
-            queryKey: ["skills"],
-            refetchType: "all",
-          });
-          await queryClient.refetchQueries({
-            queryKey: ["skills"],
-            type: "all",
-          });
-          toast.success(t("deeplink.skillImportSuccess"), {
-            description: t("deeplink.skillImportSuccessDescription", {
-              repo: request.repo,
-            }),
-            closeButton: true,
-          });
         }
       } else if (isMcpImportResult(result)) {
         // 兜底处理：旧版本后端可能未返回 type 字段
@@ -447,8 +430,6 @@ export function DeepLinkImportDialog() {
         return t("deeplink.importPrompt");
       case "mcp":
         return t("deeplink.importMcp");
-      case "skill":
-        return t("deeplink.importSkill");
       default:
         return t("deeplink.confirmImport");
     }
@@ -461,8 +442,6 @@ export function DeepLinkImportDialog() {
         return t("deeplink.importPromptDescription");
       case "mcp":
         return t("deeplink.importMcpDescription");
-      case "skill":
-        return t("deeplink.importSkillDescription");
       default:
         return t("deeplink.confirmImportDescription");
     }
@@ -490,9 +469,6 @@ export function DeepLinkImportDialog() {
               )}
               {request.resource === "mcp" && (
                 <McpConfirmation request={request} />
-              )}
-              {request.resource === "skill" && (
-                <SkillConfirmation request={request} />
               )}
 
               {/* Legacy Provider View */}
