@@ -4191,10 +4191,6 @@ mod tests {
         db.update_mcp_server_app_enabled("m", &crate::app_config::AppType::Dsh, false)?;
         let saved = db.get_all_mcp_servers()?;
         assert!(!saved["m"].apps.dsh && saved["m"].apps.kimi);
-        let skill = serde_json::from_value(serde_json::json!({"id":"s", "name":"s", "directory":"s", "apps":{"dsh":true,"claude":true}, "installedAt":0})).unwrap();
-        db.save_skill(&skill)?;
-        assert!(db.get_installed_skill("s")?.unwrap().apps.dsh);
-        assert!(db.get_all_installed_skills()?["s"].apps.claude);
         Ok(())
     }
 
@@ -4482,21 +4478,6 @@ mod tests {
                 && !saved["m"].apps.omp
                 && saved["m"].apps.kimi
         );
-        let skill = serde_json::from_value(serde_json::json!({"id":"s", "name":"s", "description":"", "directory":"s", "apps":{"workbuddy":true,"dsh":true,"claude":true}, "installedAt":0})).unwrap();
-        db.save_skill(&skill)?;
-        let saved = db.get_installed_skill("s")?.unwrap();
-        assert!(saved.apps.workbuddy && saved.apps.dsh && saved.apps.claude);
-        let mut apps = saved.apps.clone();
-        apps.workbuddy = false;
-        db.update_skill_apps("s", &apps)?;
-        let saved = &db.get_all_installed_skills()?["s"];
-        assert!(!saved.apps.workbuddy && saved.apps.dsh && saved.apps.claude);
-        let mut apps = saved.apps.clone();
-        apps.dsh = false;
-        apps.workbuddy = true;
-        db.update_skill_apps("s", &apps)?;
-        let saved = &db.get_all_installed_skills()?["s"];
-        assert!(saved.apps.workbuddy && !saved.apps.dsh && saved.apps.claude);
         Ok(())
     }
 
@@ -4566,15 +4547,6 @@ mod tests {
         let saved = db.get_all_mcp_servers()?;
         assert!(!saved["m"].apps.copilot);
         assert!(saved["m"].apps.kimi);
-        let skill = serde_json::from_value(serde_json::json!({"id":"s", "name":"s", "description":"", "directory":"s", "apps":{"copilot":true,"claude":true}, "installedAt":0})).unwrap();
-        db.save_skill(&skill)?;
-        let saved = db.get_installed_skill("s")?.unwrap();
-        assert!(saved.apps.copilot && saved.apps.claude);
-        let mut apps = saved.apps.clone();
-        apps.copilot = false;
-        db.update_skill_apps("s", &apps)?;
-        let saved = db.get_all_installed_skills()?;
-        assert!(!saved["s"].apps.copilot && saved["s"].apps.claude);
         Ok(())
     }
 
@@ -4587,11 +4559,6 @@ mod tests {
         let saved = db.get_all_mcp_servers()?;
         assert!(!saved["m"].apps.kimi);
         assert!(saved["m"].apps.codex);
-        let skill = serde_json::from_value(serde_json::json!({"id":"s", "name":"s", "description":"", "directory":"s", "apps":{"kimi":true,"claude":true}, "installedAt":0})).unwrap();
-        db.save_skill(&skill)?;
-        let saved = db.get_installed_skill("s")?.unwrap();
-        assert!(saved.apps.kimi && saved.apps.claude);
-        assert!(db.get_all_installed_skills()?["s"].apps.kimi);
         Ok(())
     }
 
@@ -4625,15 +4592,6 @@ mod tests {
         server.apps.agy = false;
         db.update_mcp_server_app_enabled("m", &crate::app_config::AppType::Agy, false)?;
         assert_eq!(db.get_all_mcp_servers()?["m"].apps, server.apps);
-        let skill: crate::app_config::InstalledSkill = serde_json::from_value(serde_json::json!({"id":"s", "name":"s", "directory":"s", "installedAt":0, "apps":{"agy":true,"gemini":true}})).unwrap();
-        db.save_skill(&skill)?;
-        assert!(db.get_installed_skill("s")?.unwrap().apps.agy);
-        let mut apps = skill.apps;
-        apps.agy = false;
-        db.update_skill_apps("s", &apps)?;
-        let read = db.get_all_installed_skills()?;
-        assert!(!read["s"].apps.agy);
-        assert!(read["s"].apps.gemini);
         Ok(())
     }
 

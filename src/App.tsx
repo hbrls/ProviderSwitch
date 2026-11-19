@@ -175,10 +175,6 @@ const SessionManagerPage = lazy(() =>
 );
 const UsageScriptModal = lazy(() => import("@/components/UsageScriptModal"));
 const UnifiedMcpPanel = lazy(() => import("@/components/mcp/UnifiedMcpPanel"));
-const PromptPanel = lazy(() => import("@/components/prompts/PromptPanel"));
-const UnifiedSkillsPanel = lazy(
-  () => import("@/components/skills/UnifiedSkillsPanel"),
-);
 const WorkspaceFilesPanel = lazy(
   () => import("@/components/workspace/WorkspaceFilesPanel"),
 );
@@ -273,7 +269,6 @@ function App() {
     nonce: number;
   } | null>(null);
   const [mcpManagementBusy, setMcpManagementBusy] = useState(false);
-  const [skillsNavigationBusy, setSkillsNavigationBusy] = useState(false);
   const [promptNavigationBusy, setPromptNavigationBusy] = useState(false);
 
   useEffect(() => {
@@ -581,7 +576,6 @@ function App() {
   useTauriEvent("profile-applied", async () => {
     await queryClient.invalidateQueries({ queryKey: ["profiles"] });
     await queryClient.invalidateQueries({ queryKey: ["mcp", "all"] });
-    await queryClient.invalidateQueries({ queryKey: ["skills"] });
     await queryClient.invalidateQueries({
       queryKey: proxyKeys.takeoverStatus,
     });
@@ -848,34 +842,6 @@ function App() {
   }, [t]);
 
   useEffect(() => {
-    const checkSkillsMigration = async () => {
-      try {
-        const result = await invoke<{ count: number; error?: string } | null>(
-          "get_skills_migration_result",
-        );
-        if (result?.error) {
-          toast.error(t("migration.skillsFailed"), {
-            description: t("migration.skillsFailedDescription"),
-            closeButton: true,
-          });
-          console.error("[App] Skills SSOT migration failed:", result.error);
-          return;
-        }
-        if (result && result.count > 0) {
-          toast.success(t("migration.skillsSuccess", { count: result.count }), {
-            closeButton: true,
-          });
-          await queryClient.invalidateQueries({ queryKey: ["skills"] });
-        }
-      } catch (error) {
-        console.error("[App] Failed to check skills migration result:", error);
-      }
-    };
-
-    checkSkillsMigration();
-  }, [t, queryClient]);
-
-  useEffect(() => {
     const checkEnvOnSwitch = async () => {
       try {
         if (
@@ -916,8 +882,7 @@ function App() {
   }, [activeApp]);
 
   const currentViewRef = useRef(currentView);
-  const managementBusy =
-    mcpManagementBusy || skillsNavigationBusy || promptNavigationBusy;
+  const managementBusy = mcpManagementBusy || promptNavigationBusy;
   const managementBusyRef = useRef(false);
   managementBusyRef.current = managementBusy;
 
@@ -1061,10 +1026,7 @@ function App() {
       if (isTextEditableTarget(event.target)) return;
 
       const view = currentViewRef.current;
-      if (view === "skillsDiscovery") {
-        event.preventDefault();
-        setCurrentView("skills");
-      } else if (view === "settings") {
+      if (view === "settings") {
         event.preventDefault();
         setCurrentView(settingsReturnViewRef.current);
       }
@@ -1842,17 +1804,6 @@ function App() {
       case "mcp":
         return (
           <UnifiedMcpPanel onInteractionBlockedChange={setMcpManagementBusy} />
-        );
-      case "skills":
-      case "skillsDiscovery":
-        // 「已安装 / 发现」合成一页；旧的 skillsDiscovery 视图直接打开「发现」段
-        return (
-          <UnifiedSkillsPanel
-            initialView={
-              currentView === "skillsDiscovery" ? "discover" : "installed"
-            }
-            onNavigationBlockedChange={setSkillsNavigationBusy}
-          />
         );
       case "prompts":
         return (

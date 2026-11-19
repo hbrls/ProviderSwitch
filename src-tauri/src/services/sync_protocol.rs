@@ -1,9 +1,8 @@
 //! Transport-agnostic sync protocol layer.
 //!
-//! Shared by WebDAV, S3, and future transports. Artifact set: `db.sql` + `skills.zip`.
+//! Shared by WebDAV, S3, and future transports. Artifact set: `db.sql`.
 
 use std::collections::BTreeMap;
-use std::fs;
 use std::future::Future;
 use std::process::Command;
 use std::sync::OnceLock;
@@ -12,15 +11,8 @@ use std::time::Duration;
 use chrono::Utc;
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
-use tempfile::tempdir;
 
 use crate::error::AppError;
-use crate::services::skill::{skill_state_read_guard, skill_state_write_guard};
-
-// Re-export archive functions for use by transport layers.
-pub(crate) use super::webdav_sync::archive::{
-    backup_current_skills, restore_skills_zip, zip_skills_ssot,
-};
 
 // ─── Protocol constants ──────────────────────────────────────
 
@@ -31,7 +23,6 @@ pub(crate) const PROTOCOL_VERSION: u32 = 2;
 pub(crate) const DB_COMPAT_VERSION: u32 = 6;
 pub(crate) const LEGACY_DB_COMPAT_VERSION: u32 = 5;
 pub(crate) const REMOTE_DB_SQL: &str = "db.sql";
-pub(crate) const REMOTE_SKILLS_ZIP: &str = "skills.zip";
 pub(crate) const REMOTE_MANIFEST: &str = "manifest.json";
 pub(crate) const MAX_DEVICE_NAME_LEN: usize = 64;
 pub(crate) const MAX_MANIFEST_BYTES: usize = 1024 * 1024;
@@ -62,7 +53,7 @@ pub(crate) fn transfer_timeout(len: u64) -> Duration {
 /// Serialize every snapshot upload/download across all transports.
 ///
 /// WebDAV and S3 used to own separate mutexes, which allowed two transports to
-/// restore the database and Skills SSOT concurrently. Keep the lock in this
+/// restore the database concurrently. Keep the lock in this
 /// transport-agnostic layer so future transports automatically share it too.
 pub(crate) fn sync_mutex() -> &'static tokio::sync::Mutex<()> {
     static LOCK: OnceLock<tokio::sync::Mutex<()>> = OnceLock::new();
@@ -145,7 +136,6 @@ pub(crate) struct ArtifactMeta {
 
 pub(crate) struct LocalSnapshot {
     pub db_sql: Vec<u8>,
-    pub skills_zip: Vec<u8>,
     pub manifest_bytes: Vec<u8>,
     pub manifest_hash: String,
 }
@@ -170,26 +160,9 @@ impl RemoteLayout {
 pub(crate) fn build_local_snapshot(
     db: &crate::database::Database,
 ) -> Result<LocalSnapshot, AppError> {
-    // Keep the DB's skill rows and the filesystem SSOT at one logical point in
-    // time. Skill writers take the matching write guard around both mutations.
-    let _skill_state_guard = skill_state_read_guard();
-
     // Export database to SQL string
     let sql_string = db.export_sql_string_for_sync()?;
     let db_sql = sql_string.into_bytes();
-
-    // Pack skills into deterministic ZIP
-    let tmp = tempdir().map_err(|e| {
-        io_context_localized(
-            "sync.snapshot_tmpdir_failed",
-            "创建快照临时目录失败",
-            "Failed to create temporary directory for snapshot",
-            e,
-        )
-    })?;
-    let skills_zip_path = tmp.path().join(REMOTE_SKILLS_ZIP);
-    zip_skills_ssot(&skills_zip_path)?;
-    let skills_zip = fs::read(&skills_zip_path).map_err(|e| AppError::io(&skills_zip_path, e))?;
 
     // Build artifact map and compute hashes
     let mut artifacts = BTreeMap::new();
@@ -198,13 +171,6 @@ pub(crate) fn build_local_snapshot(
         ArtifactMeta {
             sha256: sha256_hex(&db_sql),
             size: db_sql.len() as u64,
-        },
-    );
-    artifacts.insert(
-        REMOTE_SKILLS_ZIP.to_string(),
-        ArtifactMeta {
-            sha256: sha256_hex(&skills_zip),
-            size: skills_zip.len() as u64,
         },
     );
 
@@ -224,7 +190,6 @@ pub(crate) fn build_local_snapshot(
 
     Ok(LocalSnapshot {
         db_sql,
-        skills_zip,
         manifest_bytes,
         manifest_hash,
     })
@@ -375,11 +340,7 @@ pub(crate) fn verify_artifact(
 
 // ─── Snapshot application ────────────────────────────────────
 
-pub(crate) fn apply_snapshot(
-    db: &crate::database::Database,
-    db_sql: &[u8],
-    skills_zip: &[u8],
-) -> Result<(), AppError> {
+pub(crate) fn apply_snapshot(db: &crate::database::Database, db_sql: &[u8]) -> Result<(), AppError> {
     let sql_str = std::str::from_utf8(db_sql).map_err(|e| {
         localized(
             "sync.sql_not_utf8",
@@ -387,19 +348,7 @@ pub(crate) fn apply_snapshot(
             format!("SQL is not valid UTF-8: {e}"),
         )
     })?;
-    // Exclude installs, uninstalls, updates, and local projection while Skills
-    // are backed up/replaced and the corresponding database snapshot is applied.
-    let _skill_state_guard = skill_state_write_guard();
-    let skills_backup = backup_current_skills()?;
-
-    // Replace skills first, then import database; roll back skills on DB failure.
-    restore_skills_zip(skills_zip)?;
-
-    if let Err(db_err) = db.import_sql_string_for_sync(sql_str) {
-        return Err(skills_backup.rollback_after_import_error(db_err));
-    }
-
-    Ok(())
+    db.import_sql_string_for_sync(sql_str).map(|_| ())
 }
 
 // ─── Utilities ───────────────────────────────────────────────
@@ -551,7 +500,6 @@ mod tests {
     fn snapshot_id_is_stable() {
         let mut artifacts = BTreeMap::new();
         artifacts.insert("db.sql".to_string(), artifact("abc123", 100));
-        artifacts.insert("skills.zip".to_string(), artifact("def456", 200));
 
         let id1 = compute_snapshot_id(&artifacts);
         let id2 = compute_snapshot_id(&artifacts);
@@ -605,7 +553,6 @@ mod tests {
     fn manifest_with(format: &str, version: u32, db_compat_version: Option<u32>) -> SyncManifest {
         let mut artifacts = BTreeMap::new();
         artifacts.insert("db.sql".to_string(), artifact("abc", 1));
-        artifacts.insert("skills.zip".to_string(), artifact("def", 2));
         SyncManifest {
             format: format.to_string(),
             version,
@@ -717,7 +664,7 @@ mod tests {
 
     #[test]
     fn validate_artifact_size_limit_rejects_oversized_artifacts() {
-        let err = validate_artifact_size_limit("skills.zip", MAX_SYNC_ARTIFACT_BYTES + 1)
+        let err = validate_artifact_size_limit("db.sql", MAX_SYNC_ARTIFACT_BYTES + 1)
             .expect_err("artifact larger than limit should be rejected");
         assert!(
             err.to_string().contains("too large") || err.to_string().contains("超过"),
@@ -727,7 +674,7 @@ mod tests {
 
     #[test]
     fn validate_artifact_size_limit_accepts_limit_boundary() {
-        assert!(validate_artifact_size_limit("skills.zip", MAX_SYNC_ARTIFACT_BYTES).is_ok());
+        assert!(validate_artifact_size_limit("db.sql", MAX_SYNC_ARTIFACT_BYTES).is_ok());
     }
 
     #[test]
