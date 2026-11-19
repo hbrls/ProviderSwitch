@@ -43,6 +43,7 @@ impl McpApps {
             AppType::Codex => self.codex,
             AppType::Gemini => self.gemini,
             AppType::GrokBuild => self.grokbuild,
+            AppType::Kilo => false,
             AppType::OpenCode => self.opencode,
             AppType::OpenClaw => false, // OpenClaw doesn't support MCP
             AppType::Hermes => self.hermes,
@@ -65,6 +66,7 @@ impl McpApps {
             AppType::Codex => self.codex = enabled,
             AppType::Gemini => self.gemini = enabled,
             AppType::GrokBuild => self.grokbuild = enabled,
+            AppType::Kilo => {},
             AppType::OpenCode => self.opencode = enabled,
             AppType::OpenClaw => {} // OpenClaw doesn't support MCP, ignore
             AppType::Hermes => self.hermes = enabled,
@@ -250,6 +252,7 @@ pub enum AppType {
     Codex,
     Gemini,
     GrokBuild,
+    Kilo,
     OpenCode,
     OpenClaw,
     Hermes,
@@ -322,6 +325,15 @@ impl AppType {
                 id: "grokbuild",
                 additive: false,
                 local_proxy: true,
+                route_mode: true,
+                stack: false,
+            },
+            // Kilo 只提交路由状态（见 `mode::controller`），不重写客户端配置；路由数据面
+            // 自带 per-provider HttpProxy，但不进故障转移队列。
+            AppType::Kilo => AppSpec {
+                id: "kilo",
+                additive: false,
+                local_proxy: false,
                 route_mode: true,
                 stack: false,
             },
@@ -410,12 +422,13 @@ impl AppType {
     }
 
     /// 所有应用，按默认顺序
-    pub const ALL: [AppType; 16] = [
+    pub const ALL: [AppType; 17] = [
         AppType::Claude,
         AppType::ClaudeDesktop,
         AppType::Codex,
         AppType::Gemini,
         AppType::GrokBuild,
+        AppType::Kilo,
         AppType::OpenCode,
         AppType::OpenClaw,
         AppType::Hermes,
@@ -445,6 +458,7 @@ impl FromStr for AppType {
             "codex" => Ok(AppType::Codex),
             "gemini" => Ok(AppType::Gemini),
             "grokbuild" | "grok-build" | "grok_build" | "grok" => Ok(AppType::GrokBuild),
+            "kilo" => Ok(AppType::Kilo),
             "opencode" => Ok(AppType::OpenCode),
             "openclaw" => Ok(AppType::OpenClaw),
             "hermes" => Ok(AppType::Hermes),
@@ -498,6 +512,7 @@ impl CommonConfigSnippets {
             AppType::Codex => self.codex.as_ref(),
             AppType::Gemini => self.gemini.as_ref(),
             AppType::GrokBuild => None,
+            AppType::Kilo => None,
             AppType::OpenCode => self.opencode.as_ref(),
             AppType::OpenClaw => self.openclaw.as_ref(),
             AppType::Hermes => self.hermes.as_ref(),
@@ -520,6 +535,7 @@ impl CommonConfigSnippets {
             AppType::Codex => self.codex = snippet,
             AppType::Gemini => self.gemini = snippet,
             AppType::GrokBuild => {}
+            AppType::Kilo => {}
             AppType::OpenCode => self.opencode = snippet,
             AppType::OpenClaw => self.openclaw = snippet,
             AppType::Hermes => self.hermes = snippet,
@@ -720,6 +736,7 @@ impl MultiAppConfig {
                 AppType::Codex => &self.mcp.codex.servers,
                 AppType::Gemini => &self.mcp.gemini.servers,
                 AppType::GrokBuild => continue,
+                AppType::Kilo => continue,
                 AppType::OpenCode => &self.mcp.opencode.servers,
                 AppType::OpenClaw => continue, // OpenClaw MCP is still in development, skip
                 AppType::Hermes => continue,   // Hermes didn't exist in v3.6.x, skip

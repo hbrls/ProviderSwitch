@@ -546,6 +546,7 @@ export function ProviderList({
           onImport={
             appHas(appId, "piFamily") ||
             appId === "mcode" ||
+            appId === "kilo" ||
             appId === "kimi" ||
             appId === "dsh" ||
             appId === "workbuddy"

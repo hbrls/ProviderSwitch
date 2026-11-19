@@ -223,6 +223,8 @@ impl Provider {
                 str_at(settings.pointer("/options/baseURL")),
                 str_at(settings.pointer("/options/apiKey")),
             ),
+            // Kilo has no credential extraction in this phase.
+            AppType::Kilo => (String::new(), String::new()),
             AppType::Kimi => (
                 str_at(settings.pointer("/provider/base_url")),
                 str_at(settings.pointer("/provider/api_key")),

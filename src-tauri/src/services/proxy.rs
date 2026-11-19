@@ -182,7 +182,7 @@ impl ProxyService {
     /// 各应用是否处于代理模式（读设备本地的模式状态，不读会随云同步的
     /// `proxy_config.enabled`）。
     pub async fn get_takeover_status(&self) -> Result<ProxyTakeoverStatus, String> {
-        let [claude, codex, gemini, grokbuild, claude_desktop] =
+        let [claude, codex, gemini, grokbuild, claude_desktop, kilo] =
             crate::mode::current::proxy_flags([
                 AppType::Claude,
                 AppType::Codex,

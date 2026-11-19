@@ -2022,6 +2022,7 @@ mod tests {
                 AppType::Gemini,
                 AppType::GrokBuild,
                 AppType::ClaudeDesktop,
+                AppType::Kilo,
             ]
         );
     }

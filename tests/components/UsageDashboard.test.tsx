@@ -383,6 +383,7 @@ describe("UsageDashboard", () => {
         codex: true,
         gemini: false,
         grokbuild: false,
+        kilo: false,
         opencode: false,
         openclaw: true,
         hermes: true,
