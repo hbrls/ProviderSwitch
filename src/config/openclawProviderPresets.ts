@@ -819,66 +819,6 @@ export const openclawProviderPresets: OpenClawProviderPreset[] = [
       modelCatalog: { "kimi-coding/kimi-for-coding": { alias: "Kimi" } },
     },
   },
-
-  {
-    name: "PackyCode",
-    websiteUrl: "https://www.packyapi.ai",
-    apiKeyUrl: "https://www.packyapi.ai/register?aff=cc-switch",
-    settingsConfig: {
-      baseUrl: "https://www.packyapi.ai",
-      apiKey: "",
-      api: "anthropic-messages",
-      models: packyCodeModels(),
-    },
-    category: "third_party",
-    isPartner: true,
-    partnerPromotionKey: "packycode",
-    icon: "packycode",
-    templateValues: {
-      apiKey: {
-        label: "API Key",
-        placeholder: "",
-        editorValue: "",
-      },
-    },
-    suggestedDefaults: {
-      model: {
-        primary: "packycode/claude-opus-5-5",
-        fallbacks: ["packycode/claude-sonnet-5-5"],
-      },
-      modelCatalog: {
-        "packycode/claude-opus-5-5": { alias: "Opus" },
-        "packycode/claude-sonnet-5-5": { alias: "Sonnet" },
-      },
-    },
-  },
-  {
-    name: "APINebula",
-    websiteUrl: "https://apinebula.ai",
-    apiKeyUrl: "https://apinebula.ai/VjM74M",
-    settingsConfig: {
-      baseUrl: "https://apinebula.ai/v1",
-      apiKey: "",
-      api: "openai-completions",
-      models: apiNebulaModels(),
-    },
-    category: "third_party",
-    isPartner: true,
-    partnerPromotionKey: "apinebula",
-    icon: "apinebula",
-    templateValues: {
-      apiKey: {
-        label: "API Key",
-        placeholder: "",
-        editorValue: "",
-      },
-    },
-    suggestedDefaults: {
-      model: {
-        primary: "apinebula/gpt-6.1-sol",
-      },
-    },
-  },
   {
     name: "AICodeMirror",
     websiteUrl: "https://www.aicodemirror.ai",
@@ -1773,39 +1713,6 @@ export const openclawProviderPresets: OpenClawProviderPreset[] = [
         "apikeyfun/claude-opus-5-5": { alias: "Opus" },
         "apikeyfun/claude-sonnet-5-5": { alias: "Sonnet" },
         "apikeyfun/claude-haiku-5-5": { alias: "Haiku" },
-      },
-    },
-  },
-  {
-    name: "9527CODE",
-    websiteUrl: "https://9527.codes/register?channel=ccs",
-    apiKeyUrl: "https://9527.codes/register?channel=ccs",
-    settingsConfig: {
-      baseUrl: "https://9527.codes",
-      apiKey: "",
-      api: "anthropic-messages",
-      models: runApiModels(),
-    },
-    category: "aggregator",
-    isPartner: true,
-    partnerPromotionKey: "9527code",
-    icon: "9527code",
-    templateValues: {
-      apiKey: {
-        label: "API Key",
-        placeholder: "",
-        editorValue: "",
-      },
-    },
-    suggestedDefaults: {
-      model: {
-        primary: "9527code/claude-opus-5-5",
-        fallbacks: ["9527code/claude-sonnet-5-5"],
-      },
-      modelCatalog: {
-        "9527code/claude-opus-5-5": { alias: "Opus" },
-        "9527code/claude-sonnet-5-5": { alias: "Sonnet" },
-        "9527code/claude-haiku-5-5": { alias: "Haiku" },
       },
     },
   },
