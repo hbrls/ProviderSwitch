@@ -70,3 +70,10 @@ async fn resolve_copilot_base_url_override(
 
     Ok(Some(endpoint))
 }
+
+// 鹈鹕测试命令在 `provider_quality_check`，只在这里 re-export 供 invoke_handler 注册。
+// generate_handler 会把路径末段改写成 `commands::__cmd__test_provider_chat!`，
+// 所以隐藏宏必须和函数一起导出。
+pub use super::provider_quality_check::test_provider_chat;
+#[doc(hidden)]
+pub use super::provider_quality_check::__cmd__test_provider_chat;
