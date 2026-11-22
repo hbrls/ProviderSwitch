@@ -42,7 +42,7 @@ pub use dao::UnreadableEntry;
 
 use crate::config::get_app_config_dir;
 use crate::error::AppError;
-use rusqlite::{hooks::Action, Connection};
+use rusqlite::Connection;
 use serde::Serialize;
 use std::sync::{Mutex, MutexGuard};
 
@@ -125,19 +125,6 @@ pub struct Database {
     pub(crate) log_count_cache: Mutex<Option<crate::services::usage_stats::LogCountCache>>,
 }
 
-fn register_db_change_hook(conn: &Connection) {
-    conn.update_hook(Some(
-        |action: Action, _database: &str, table: &str, _row_id: i64| match action {
-            Action::SQLITE_INSERT | Action::SQLITE_UPDATE | Action::SQLITE_DELETE => {
-                use crate::services::{auto_sync, s3_auto_sync, webdav_auto_sync};
-                auto_sync::notify_db_changed::<webdav_auto_sync::WebDavAutoSync>(table);
-                auto_sync::notify_db_changed::<s3_auto_sync::S3AutoSync>(table);
-            }
-            _ => {}
-        },
-    ));
-}
-
 impl Database {
     /// 初始化数据库连接并创建表
     ///
@@ -162,7 +149,6 @@ impl Database {
             conn.execute("PRAGMA auto_vacuum = INCREMENTAL;", [])
                 .map_err(|e| AppError::Database(e.to_string()))?;
         }
-        register_db_change_hook(&conn);
 
         let db = Self {
             conn: Mutex::new(conn),
@@ -226,7 +212,6 @@ impl Database {
             .map_err(|e| AppError::Database(e.to_string()))?;
         conn.execute("PRAGMA auto_vacuum = INCREMENTAL;", [])
             .map_err(|e| AppError::Database(e.to_string()))?;
-        register_db_change_hook(&conn);
 
         let db = Self {
             conn: Mutex::new(conn),

@@ -1186,15 +1186,6 @@ pub fn run() {
             }
 
             let _tray = tray_builder.build(app)?;
-            #[cfg(target_os = "windows")]
-            tray_compat::install(app.handle());
-            crate::services::auto_sync::start_worker::<
-                crate::services::webdav_auto_sync::WebDavAutoSync,
-            >(app_state.db.clone(), app.handle().clone());
-            crate::services::auto_sync::start_worker::<crate::services::s3_auto_sync::S3AutoSync>(
-                app_state.db.clone(),
-                app.handle().clone(),
-            );
             // 将同一个实例注入到全局状态，避免重复创建导致的不一致
             app.manage(app_state);
             app.manage(services::kimi_oauth::KimiOAuthManager::default());
@@ -1582,18 +1573,6 @@ pub fn run() {
             // theirs: config import/export and dialogs
             commands::export_config_to_file,
             commands::import_config_from_file,
-            commands::webdav_test_connection,
-            commands::webdav_sync_upload,
-            commands::webdav_sync_download,
-            commands::webdav_sync_save_settings,
-            commands::webdav_sync_clear_settings,
-            commands::webdav_sync_fetch_remote_info,
-            commands::s3_test_connection,
-            commands::s3_sync_upload,
-            commands::s3_sync_download,
-            commands::s3_sync_save_settings,
-            commands::s3_sync_clear_settings,
-            commands::s3_sync_fetch_remote_info,
             commands::save_file_dialog,
             commands::open_file_dialog,
             commands::create_db_backup,
