@@ -18,6 +18,10 @@ impl RequestForwarder {
         body_bytes: Vec<u8>,
         request_is_streaming: bool,
         preserve_exact_header_case: bool,
+        // Per-provider proxy override. Outer `None` = use the global proxy;
+        // `Some(None)` = force direct connection; `Some(Some(url))` = use
+        // this provider-level proxy.
+        provider_proxy_url: Option<Option<&str>>,
     ) -> Result<ProxyResponse, ProxyError> {
         // 确定超时
         let timeout = if self.non_streaming_timeout.is_zero() {
@@ -34,6 +38,11 @@ impl RequestForwarder {
             .as_deref()
             .map(|u| u.starts_with("socks5"))
             .unwrap_or(false);
+
+        let effective_proxy_url: Option<&str> = match provider_proxy_url {
+            Some(explicit) => explicit,
+            None => upstream_proxy_url.as_deref(),
+        };
 
         // 发送请求
         Ok(if is_socks_proxy || !preserve_exact_header_case {
@@ -88,7 +97,7 @@ impl RequestForwarder {
                 extensions.clone(),
                 body_bytes,
                 timeout,
-                upstream_proxy_url.as_deref(),
+                effective_proxy_url,
             )
             .await?
         })

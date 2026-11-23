@@ -2376,6 +2376,21 @@ impl RequestForwarder {
             is_copilot,
         );
 
+        // Claude Desktop Routing uses only the current request's Provider proxy.
+        // Missing/blank values mean direct connection; global proxy state is untouched.
+        let provider_proxy_url = if matches!(app_type, AppType::ClaudeDesktop) {
+            Some(
+                provider
+                    .meta
+                    .as_ref()
+                    .and_then(|meta| meta.claude_desktop_proxy_url.as_deref())
+                    .map(str::trim)
+                    .filter(|value| !value.is_empty()),
+            )
+        } else {
+            None
+        };
+
         let response = self
             .send_upstream(
                 &url,
@@ -2386,6 +2401,7 @@ impl RequestForwarder {
                 body_bytes,
                 request_is_streaming,
                 preserve_exact_header_case,
+                provider_proxy_url,
             )
             .await?;
 
