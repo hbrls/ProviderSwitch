@@ -1,8 +1,9 @@
 packages: []
 
-onlyBuiltDependencies:
-  - '@tailwindcss/oxide'
-  - esbuild
+lockfile: true
+sharedWorkspaceLockfile: false
 
-ignoredBuiltDependencies:
-  - msw
+allowBuilds:
+  '@tailwindcss/oxide': true
+  esbuild: true
+  msw: true
