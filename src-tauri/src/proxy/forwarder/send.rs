@@ -96,7 +96,8 @@ impl RequestForwarder {
                 extensions.clone(),
                 body_bytes,
                 header_timeout,
-                upstream_proxy_url.as_deref(),
+                // provider 级代理优先于全局代理（外层 None = 全局代理）
+                effective_proxy_url,
             )
             .await?
         })

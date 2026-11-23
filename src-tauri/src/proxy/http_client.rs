@@ -369,24 +369,6 @@ pub fn no_redirect() -> Result<Client, String> {
         .unwrap_or(client))
 }
 
-/// 只走 https 的客户端（跳转到 http 直接报错），代理设置与全局客户端一致。
-/// 带 `Authorization` 的请求用它：reqwest 只在换主机或换端口时去掉认证头，同主机
-/// 同端口从 https 跳到 http（非默认端口时会发生）会把凭据明文发出去。
-pub fn https_only() -> Result<Client, String> {
-    if let Some(lock) = HTTPS_ONLY_CLIENT.get() {
-        if let Ok(client) = lock.read() {
-            return Ok(client.clone());
-        }
-    }
-    let client = build_https_only_client(get_current_proxy_url().as_deref())?;
-    let _ = HTTPS_ONLY_CLIENT.set(RwLock::new(client.clone()));
-    Ok(HTTPS_ONLY_CLIENT
-        .get()
-        .and_then(|lock| lock.read().ok())
-        .map(|c| c.clone())
-        .unwrap_or(client))
-}
-
 /// A one-off no-redirect client for an explicit proxy (`None` follows the system
 /// proxy), leaving the saved global proxy untouched.
 pub(crate) fn no_redirect_with_proxy(
