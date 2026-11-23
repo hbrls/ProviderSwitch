@@ -13,6 +13,7 @@ use super::{
     usage::parser::TokenUsage,
     ProxyError,
 };
+use crate::provider::Provider;
 use crate::database::PRICING_SOURCE_REQUEST;
 use axum::http::{header::HeaderMap, HeaderName};
 use axum::response::{IntoResponse, Response};
@@ -202,6 +203,8 @@ pub struct ResponseContext {
     pub non_streaming_timeout: Duration,
     /// Kilo 必须保持上游非流式响应的原始字节和实体头。
     pub preserve_body: bool,
+    /// 请求开始时的供应商计价倍率（供应商可能随故障转移变化，这里固定快照）。
+    pub multiplier: rust_decimal::Decimal,
 }
 
 impl ResponseContext {
@@ -223,10 +226,16 @@ impl ResponseContext {
             streaming_timeout: ctx.streaming_timeout_config(),
             non_streaming_timeout,
             preserve_body: false,
+            multiplier: crate::provider::billing_multiplier(&ctx.provider),
         }
     }
 
-    pub fn for_kilo(start_time: Instant, session_id: String, outbound_model: String) -> Self {
+    pub fn for_kilo(
+        start_time: Instant,
+        session_id: String,
+        outbound_model: String,
+        provider: &Provider,
+    ) -> Self {
         Self {
             start_time,
             tag: "Kilo",
@@ -240,6 +249,7 @@ impl ResponseContext {
             },
             non_streaming_timeout: Duration::ZERO,
             preserve_body: true,
+            multiplier: crate::provider::billing_multiplier(provider),
         }
     }
 }
@@ -656,8 +666,8 @@ pub(crate) fn create_usage_collector(
     }
 
     let state = state.clone();
-    let provider_id = ctx.provider.id.clone();
-    let multiplier = crate::provider::billing_multiplier(&ctx.provider);
+    let provider_id = provider_id.to_string();
+    let multiplier = ctx.multiplier;
     let request_model = ctx.request_model.clone();
     // 流式事件缺失模型名时的归因兜底：映射后的出站模型（路由接管真值）优先，
     // 其次才是客户端请求别名
@@ -769,8 +779,8 @@ fn spawn_log_usage(
     }
 
     let state = state.clone();
-    let provider_id = ctx.provider.id.clone();
-    let multiplier = crate::provider::billing_multiplier(&ctx.provider);
+    let provider_id = provider_id.to_string();
+    let multiplier = ctx.multiplier;
     let app_type_str = ctx.app_type_str.to_string();
     let model = model.to_string();
     let request_model = request_model.to_string();
