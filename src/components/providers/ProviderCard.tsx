@@ -1,4 +1,4 @@
-import { useMemo, useState, useEffect } from "react";
+import { useMemo, useState, useEffect, useCallback } from "react";
 import {
   AlertTriangle,
   GripVertical,
@@ -13,6 +13,7 @@ import type {
 } from "@dnd-kit/core";
 import type { Provider } from "@/types";
 import type { AppId } from "@/lib/api";
+import type { StreamCheckResult } from "@/lib/api/connectivity-check";
 import { authApi } from "@/lib/api";
 import { cn } from "@/lib/utils";
 import { ProviderIconBox } from "@/components/ProviderIconBox";
@@ -65,6 +66,7 @@ import {
   terminalIsIsolated,
   terminalNeedsRoute,
 } from "./OpenTerminalDialog";
+import { ProviderConnectivityDialog } from "./ProviderConnectivityDialog";
 import type { CardChip, CardPresentation, CardTone } from "./presentation";
 import { appHas } from "@/config/appSpecs";
 
@@ -88,7 +90,7 @@ interface ProviderCardProps {
   onConfigureUsage: (provider: Provider) => void;
   onOpenWebsite: (url: string) => void;
   onDuplicate?: (provider: Provider) => void;
-  onTest?: (provider: Provider) => void;
+  onTest?: (provider: Provider) => Promise<StreamCheckResult | null> | void;
   onOpenTerminal?: (provider: Provider) => void;
   isTesting?: boolean;
   dragHandleProps?: DragHandleProps;
@@ -444,6 +446,15 @@ export function ProviderCard({
     usage.data.length > 1;
 
   const [isExpanded, setIsExpanded] = useState(false);
+  const [isConnectivityDialogOpen, setIsConnectivityDialogOpen] =
+    useState(false);
+  const checkConnectivity = useCallback(
+    (providerId: string) => {
+      if (!onTest || providerId !== provider.id) return Promise.resolve(null);
+      return Promise.resolve(onTest(provider) ?? null);
+    },
+    [onTest, provider],
+  );
   const expandLabel = isExpanded
     ? t("usage.collapse", { defaultValue: "收起" })
     : t("usage.expand", { defaultValue: "展开" });
@@ -796,7 +807,7 @@ export function ProviderCard({
             }
             onTest={
               onTest && supportsConnectivityCheck(appId, provider)
-                ? () => onTest(provider)
+                ? () => setIsConnectivityDialogOpen(true)
                 : undefined
             }
             isTesting={isTesting}
@@ -829,6 +840,16 @@ export function ProviderCard({
           />
         </div>
       </div>
+
+      {onTest && supportsConnectivityCheck(appId, provider) && (
+        <ProviderConnectivityDialog
+          appId={appId}
+          provider={provider}
+          open={isConnectivityDialogOpen}
+          onOpenChange={setIsConnectivityDialogOpen}
+          checkProvider={checkConnectivity}
+        />
+      )}
 
       {isExpanded && hasMultiplePlans && (
         <div className="mx-4 mb-3 border-t border-border pt-3">
