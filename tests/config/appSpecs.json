@@ -35,6 +35,13 @@
     "stack": false
   },
   {
+    "id": "kilo",
+    "additive": false,
+    "localProxy": false,
+    "routeMode": true,
+    "stack": false
+  },
+  {
     "id": "opencode",
     "additive": true,
     "localProxy": false,

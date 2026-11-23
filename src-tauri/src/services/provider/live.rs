@@ -45,6 +45,7 @@ pub(crate) fn provider_exists_in_live_config(
         // 切换式应用的 live 只有当前那一家，没有按标识存的条目。
         AppType::Claude
         | AppType::ClaudeDesktop
+        | AppType::Kilo
         | AppType::Codex
         | AppType::Gemini
         | AppType::GrokBuild
@@ -68,6 +69,7 @@ pub(crate) fn remove_provider_from_live(
         AppType::WorkBuddy => crate::workbuddy_config::remove_provider(provider_id),
         AppType::Claude
         | AppType::ClaudeDesktop
+        | AppType::Kilo
         | AppType::Codex
         | AppType::Gemini
         | AppType::GrokBuild
@@ -355,6 +357,7 @@ fn settings_contain_common_config(app_type: &AppType, settings: &Value, snippet:
         | AppType::Copilot
         | AppType::WorkBuddy
         | AppType::ClaudeDesktop => false,
+        | AppType::Kilo => false,
     }
 }
 
@@ -425,6 +428,7 @@ pub(crate) fn remove_common_config_from_settings(
             Ok(result)
         }
         AppType::GrokBuild
+        | AppType::Kilo
         | AppType::OpenCode
         | AppType::OpenClaw
         | AppType::Hermes
@@ -632,6 +636,11 @@ pub(crate) fn write_live_snapshot(app_type: &AppType, provider: &Provider) -> Re
                 "Grok Build configuration must be written through the key-field write flow",
             ));
         }
+        AppType::Kilo => {
+            return Err(AppError::InvalidInput(
+                "Kilo has no live config in this phase".to_string(),
+            ));
+        }        
         AppType::OpenCode => {
             // OpenCode uses additive mode - write provider to config
             use crate::opencode_config;
@@ -997,6 +1006,7 @@ pub fn sync_current_to_live(state: &AppState) -> Result<(), AppError> {
                 | AppType::Dsh
                 | AppType::Omp
                 | AppType::Copilot
+                | AppType::Kilo
         ) {
             continue;
         }
@@ -1116,6 +1126,9 @@ pub fn read_live_settings(app_type: AppType) -> Result<Value, AppError> {
             Ok(config)
         }
         AppType::GrokBuild => crate::grok_config::read_grok_live_settings(),
+        AppType::Kilo => Err(AppError::InvalidInput(
+            "Kilo has no live config in this phase".to_string(),
+        )),
         AppType::OpenClaw => {
             use crate::openclaw_config::{get_openclaw_config_path, read_openclaw_config};
 
@@ -1294,6 +1307,11 @@ pub fn import_default_config(state: &AppState, app_type: AppType) -> Result<bool
         | AppType::Omp
         | AppType::WorkBuddy => {
             unreachable!("additive mode apps are handled by early return")
+        }
+        AppType::Kilo => {
+            return Err(AppError::InvalidInput(
+                "Kilo providers do not support live config import in this phase".to_string(),
+            ));
         }
     };
 

@@ -76,7 +76,9 @@ macro_rules! app_flags {
                     AppType::Agy => Some(&mut self.agy),
                     AppType::Copilot => Some(&mut self.copilot),
                     AppType::WorkBuddy => Some(&mut self.workbuddy),
-                    AppType::OpenClaw | AppType::ClaudeDesktop => None,
+                    // Kilo 只走路由状态，不重写客户端配置，无 MCP/Skill 开关
+                    // （与 database/dao/mcp.rs 的 SSOT 列映射保持一致）。
+                    AppType::OpenClaw | AppType::ClaudeDesktop | AppType::Kilo => None,
                 }
             }
 
@@ -218,6 +220,7 @@ pub enum AppType {
     Codex,
     Gemini,
     GrokBuild,
+    Kilo,
     OpenCode,
     OpenClaw,
     Hermes,
@@ -289,6 +292,15 @@ impl AppType {
                 id: "grokbuild",
                 additive: false,
                 local_proxy: true,
+                route_mode: true,
+                stack: false,
+            },
+            // Kilo 只提交路由状态（见 `mode::controller`），不重写客户端配置；路由数据面
+            // 自带 per-provider HttpProxy，但不进故障转移队列。
+            AppType::Kilo => AppSpec {
+                id: "kilo",
+                additive: false,
+                local_proxy: false,
                 route_mode: true,
                 stack: false,
             },
@@ -377,12 +389,13 @@ impl AppType {
     }
 
     /// 所有应用，按默认顺序
-    pub const ALL: [AppType; 16] = [
+    pub const ALL: [AppType; 17] = [
         AppType::Claude,
         AppType::ClaudeDesktop,
         AppType::Codex,
         AppType::Gemini,
         AppType::GrokBuild,
+        AppType::Kilo,
         AppType::OpenCode,
         AppType::OpenClaw,
         AppType::Hermes,
@@ -418,6 +431,7 @@ impl FromStr for AppType {
             "codex" => Ok(AppType::Codex),
             "gemini" => Ok(AppType::Gemini),
             "grokbuild" | "grok-build" | "grok_build" | "grok" => Ok(AppType::GrokBuild),
+            "kilo" => Ok(AppType::Kilo),
             "opencode" => Ok(AppType::OpenCode),
             "openclaw" => Ok(AppType::OpenClaw),
             "hermes" => Ok(AppType::Hermes),
@@ -647,6 +661,7 @@ impl MultiAppConfig {
                 AppType::Codex => &self.mcp.codex.servers,
                 AppType::Gemini => &self.mcp.gemini.servers,
                 AppType::GrokBuild => continue,
+                AppType::Kilo => continue,
                 AppType::OpenCode => &self.mcp.opencode.servers,
                 AppType::OpenClaw => continue, // OpenClaw MCP is still in development, skip
                 AppType::Hermes => continue,   // Hermes didn't exist in v3.6.x, skip

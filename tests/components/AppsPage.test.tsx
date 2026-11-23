@@ -213,7 +213,7 @@ describe("AppsPage layout, grouping and diagnostics", () => {
       within(
         screen.getByRole("region", { name: "appsPage.sectionInstalled" }),
       ).getAllByRole("button", { name: "appsPage.dragHandle" }),
-    ).toHaveLength(APP_IDS.length - 2);
+    ).toHaveLength(APP_IDS.length - 3);
     expect(
       within(
         screen.getByRole("region", { name: "appsPage.sectionNotInstalled" }),

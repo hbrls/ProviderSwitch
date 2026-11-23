@@ -381,6 +381,10 @@ impl McpService {
             AppType::GrokBuild => {
                 mcp::sync_single_server_to_grokbuild(&server.id, &server.server)?;
             }
+            AppType::Kilo => {
+                // Kilo has no MCP registry in this phase.
+                log::debug!("Kilo MCP sync is not supported, skipping");
+            }            
             AppType::OpenCode => {
                 mcp::sync_single_server_to_opencode(&server.id, &server.server)?;
             }
@@ -430,6 +434,10 @@ impl McpService {
             AppType::Codex => mcp::remove_server_from_codex(id)?,
             AppType::Gemini => mcp::remove_server_from_gemini(id)?,
             AppType::GrokBuild => mcp::remove_server_from_grokbuild(id)?,
+            AppType::Kilo => {
+                // Kilo has no MCP registry in this phase.
+                log::debug!("Kilo MCP sync is not supported, skipping remove");
+            }
             AppType::OpenCode => {
                 mcp::remove_server_from_opencode(id)?;
             }
@@ -602,7 +610,7 @@ impl McpService {
             AppType::Pi => return mcp::pi::import(state),
             AppType::Omp => return mcp::omp::import(state),
             AppType::Copilot => return mcp::copilot::import(state),
-            AppType::ClaudeDesktop | AppType::OpenClaw => return Ok(0),
+            AppType::ClaudeDesktop | AppType::OpenClaw | AppType::Kilo => return Ok(0),
         };
 
         let mut temp_config = MultiAppConfig::default();
