@@ -1,5 +1,8 @@
 packages: []
 
+lockfile: true
+sharedWorkspaceLockfile: false
+
 onlyBuiltDependencies:
   - '@tailwindcss/oxide'
   - esbuild
