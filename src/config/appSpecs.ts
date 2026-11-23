@@ -118,6 +118,19 @@ export const APP_SPECS = {
     editorView: true,
     officialSubscription: true,
   },
+  // Kilo 只提交路由状态，不重写客户端配置；不进故障转移，也没有 Skills / MCP / 提示词。
+  kilo: {
+    localProxy: false,
+    routeMode: true,
+    stack: false,
+    additive: false,
+    skills: false,
+    mcp: false,
+    prompts: false,
+    managedAccount: false,
+    piFamily: false,
+    editorView: false,
+  },
   opencode: {
     localProxy: false,
     routeMode: false,

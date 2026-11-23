@@ -34,6 +34,7 @@ export interface ProxyTakeoverStatus {
   codex: boolean;
   gemini: boolean;
   grokbuild: boolean;
+  kilo: boolean;
 }
 
 /** Applied under the backend switch lock, not inferred from a possibly stale UI mode. */
