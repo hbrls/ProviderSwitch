@@ -322,9 +322,6 @@ fn test_build_gemini_provider_with_model() {
         config_url: None,
         icon_url: None,
         apps: None,
-        repo: None,
-        directory: None,
-        branch: None,
         content: None,
         description: None,
         enabled: None,
@@ -377,9 +374,6 @@ fn test_build_gemini_provider_without_model() {
         config_url: None,
         icon_url: None,
         apps: None,
-        repo: None,
-        directory: None,
-        branch: None,
         content: None,
         description: None,
         enabled: None,
@@ -425,9 +419,6 @@ fn test_deeplink_usage_script_does_not_copy_provider_credentials() {
         config_url: None,
         icon_url: None,
         apps: None,
-        repo: None,
-        directory: None,
-        branch: None,
         content: None,
         description: None,
         enabled: None,
@@ -474,9 +465,6 @@ fn usage_script_request(code: &str, usage_enabled: Option<bool>) -> DeepLinkImpo
         config_url: None,
         icon_url: None,
         apps: None,
-        repo: None,
-        directory: None,
-        branch: None,
         content: None,
         description: None,
         enabled: None,
@@ -592,9 +580,6 @@ fn test_deeplink_usage_script_omits_explicit_credentials_that_match_provider() {
         config_url: None,
         icon_url: None,
         apps: None,
-        repo: None,
-        directory: None,
-        branch: None,
         content: None,
         description: None,
         enabled: None,
@@ -642,9 +627,6 @@ fn test_deeplink_usage_script_preserves_distinct_usage_credentials() {
         config_url: None,
         icon_url: None,
         apps: None,
-        repo: None,
-        directory: None,
-        branch: None,
         content: None,
         description: None,
         enabled: None,
@@ -697,9 +679,6 @@ fn test_parse_and_merge_config_claude() {
         config_url: None,
         icon_url: None,
         apps: None,
-        repo: None,
-        directory: None,
-        branch: None,
         content: None,
         description: None,
         enabled: None,
@@ -822,9 +801,6 @@ fn test_parse_and_merge_config_url_override() {
         config_url: None,
         icon_url: None,
         apps: None,
-        repo: None,
-        directory: None,
-        branch: None,
         content: None,
         description: None,
         enabled: None,
@@ -887,9 +863,6 @@ fn test_build_claude_provider_preserves_custom_env_fields() {
         config_url: None,
         icon_url: None,
         apps: None,
-        repo: None,
-        directory: None,
-        branch: None,
         content: None,
         description: None,
         enabled: None,
@@ -944,9 +917,6 @@ fn test_build_claude_provider_without_config_unchanged() {
         config_url: None,
         icon_url: None,
         apps: None,
-        repo: None,
-        directory: None,
-        branch: None,
         content: None,
         description: None,
         enabled: None,
@@ -1093,17 +1063,6 @@ fn test_parse_mcode_and_pi_mcp_deeplink() {
     assert_eq!(apps, "mcode,pi");
     let parsed = crate::deeplink::mcp::parse_mcp_apps(apps).unwrap();
     assert!(parsed.mcode && parsed.pi);
-}
-
-#[test]
-fn test_parse_skill_deeplink() {
-    let url = "ccswitch://v1/import?resource=skill&repo=owner/repo&directory=skills&branch=dev";
-    let request = parse_deeplink_url(url).unwrap();
-
-    assert_eq!(request.resource, "skill");
-    assert_eq!(request.repo.unwrap(), "owner/repo");
-    assert_eq!(request.directory.unwrap(), "skills");
-    assert_eq!(request.branch.unwrap(), "dev");
 }
 
 // =============================================================================
@@ -2252,20 +2211,6 @@ fn agy_deeplink_enabled_key_provider_stays_out_of_live_files() {
     .unwrap();
     assert_eq!(private["model"], "link-model");
     assert_eq!(private["modelProvider"], "gemini");
-}
-
-#[test]
-fn skill_deeplink_is_a_shared_repository_not_an_agy_install() {
-    let state = AppState::new(Arc::new(Database::memory().unwrap()));
-    let request =
-        parse_deeplink_url("ccswitch://v1/import?resource=skill&repo=example/skills&app=agy")
-            .unwrap();
-    assert!(request.app.is_none());
-    assert_eq!(
-        super::skill::import_skill_from_deeplink(&state, request).unwrap(),
-        "example/skills"
-    );
-    assert!(state.db.get_all_installed_skills().unwrap().is_empty());
 }
 
 fn build_claude_desktop_from_url(

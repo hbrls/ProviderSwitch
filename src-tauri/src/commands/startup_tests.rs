@@ -210,14 +210,6 @@ fn remaining_database_commands_yield_during_session_sync_contention() {
                 .unwrap()
         };
     }
-    // Skill commands take the state last.
-    macro_rules! skill_query {
-        ($name:ident $(, $arg:expr)*) => {
-            while_connection_locked(&db, stringify!($name), super::$name($($arg,)* app.state()))
-                .unwrap()
-        };
-    }
-
     assert!(query!(get_custom_icons).is_empty());
     assert_eq!(query!(get_global_proxy_url), None);
     assert!(query!(get_universal_providers).is_empty());
@@ -244,24 +236,6 @@ fn remaining_database_commands_yield_during_session_sync_contention() {
     );
     query!(delete_profile, profile.id);
     query!(clear_current_profile, "claude".into());
-
-    assert!(skill_query!(get_installed_skills).is_empty());
-    skill_query!(scan_unmanaged_skills);
-    assert!(skill_query!(get_skill_repos).is_empty());
-    let repo = crate::services::skill::SkillRepo {
-        host: "github.com".into(),
-        owner: "octocat".into(),
-        name: "skills".into(),
-        branch: "main".into(),
-        enabled: true,
-    };
-    assert!(skill_query!(add_skill_repo, repo));
-    assert_eq!(skill_query!(get_skill_repos).len(), 1);
-    assert!(skill_query!(
-        remove_skill_repo,
-        "octocat".into(),
-        "skills".into()
-    ));
 
     // Validation errors must still reach the caller after moving work off-thread.
     assert!(tauri::async_runtime::block_on(super::get_custom_endpoints(

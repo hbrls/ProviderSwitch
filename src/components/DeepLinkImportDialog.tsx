@@ -21,7 +21,6 @@ import { useTranslation } from "react-i18next";
 import { useQueryClient } from "@tanstack/react-query";
 import { PromptConfirmation } from "./deeplink/PromptConfirmation";
 import { McpConfirmation } from "./deeplink/McpConfirmation";
-import { SkillConfirmation } from "./deeplink/SkillConfirmation";
 import { ProviderIcon } from "./ProviderIcon";
 import {
   classifyEndpoint,
@@ -407,8 +406,6 @@ export function DeepLinkImportDialog() {
         return t("deeplink.importPrompt");
       case "mcp":
         return t("deeplink.importMcp");
-      case "skill":
-        return t("deeplink.importSkill");
       default:
         return t("deeplink.confirmImport");
     }
@@ -421,8 +418,6 @@ export function DeepLinkImportDialog() {
         return t("deeplink.importPromptDescription");
       case "mcp":
         return t("deeplink.importMcpDescription");
-      case "skill":
-        return t("deeplink.importSkillDescription");
       default:
         return t("deeplink.confirmImportDescription");
     }
@@ -450,9 +445,6 @@ export function DeepLinkImportDialog() {
               )}
               {request.resource === "mcp" && (
                 <McpConfirmation request={request} />
-              )}
-              {request.resource === "skill" && (
-                <SkillConfirmation request={request} />
               )}
 
               {/* Legacy Provider View */}

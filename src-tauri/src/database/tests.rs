@@ -152,87 +152,6 @@ fn normalize_default(default: &Option<String>) -> Option<String> {
 }
 
 #[test]
-fn deleted_default_skill_repo_is_not_restored() {
-    let db = Database::memory().expect("create memory db");
-
-    assert_eq!(db.init_default_skill_repos().expect("initialize repos"), 4);
-    for repo in db.get_skill_repos().expect("get initialized repos") {
-        db.delete_skill_repo(&repo.owner, &repo.name)
-            .expect("delete repo");
-    }
-    assert!(db.get_skill_repos().expect("get deleted repos").is_empty());
-
-    assert_eq!(
-        db.init_default_skill_repos().expect("reinitialize repos"),
-        0
-    );
-    assert!(db.get_skill_repos().expect("get repos").is_empty());
-}
-
-#[test]
-fn existing_skill_repo_selection_is_not_supplemented() {
-    let db = Database::memory().expect("create memory db");
-    let default_store = crate::services::skill::SkillStore::default();
-    db.save_skill_repo(&default_store.repos[0])
-        .expect("save existing repo");
-
-    assert_eq!(db.init_default_skill_repos().expect("initialize repos"), 0);
-    assert_eq!(db.get_skill_repos().expect("get repos").len(), 1);
-    assert!(db
-        .get_bool_flag("default_skill_repos_initialized")
-        .expect("get initialized flag"));
-}
-
-#[test]
-fn migration_v26_to_v27_adds_skill_repo_host() {
-    let conn = Connection::open_in_memory().expect("open memory db");
-    conn.execute_batch(
-        r#"
-        CREATE TABLE skills (
-            id TEXT PRIMARY KEY,
-            name TEXT NOT NULL,
-            directory TEXT NOT NULL,
-            repo_owner TEXT,
-            repo_name TEXT
-        );
-        INSERT INTO skills (id, name, directory, repo_owner, repo_name)
-        VALUES ('owner/repo:demo', 'Demo', 'demo', 'owner', 'repo');
-
-        CREATE TABLE skill_repos (
-            owner TEXT NOT NULL, name TEXT NOT NULL, branch TEXT NOT NULL DEFAULT 'main',
-            enabled BOOLEAN NOT NULL DEFAULT 1, PRIMARY KEY (owner, name)
-        );
-        INSERT INTO skill_repos (owner, name, branch, enabled)
-        VALUES ('owner', 'repo', 'develop', 0);
-        "#,
-    )
-    .expect("seed v26 skill tables");
-    Database::set_user_version(&conn, 26).expect("set user_version=26");
-
-    Database::apply_schema_migrations_on_conn(&conn).expect("apply migrations");
-
-    assert_eq!(
-        Database::get_user_version(&conn).expect("version after migration"),
-        SCHEMA_VERSION
-    );
-    // 已有仓库原样保留，主机靠列默认值落成 github.com
-    let (host, branch, enabled): (String, String, bool) = conn
-        .query_row("SELECT host, branch, enabled FROM skill_repos", [], |row| {
-            Ok((row.get(0)?, row.get(1)?, row.get(2)?))
-        })
-        .expect("migrated repo");
-    assert_eq!(
-        (host.as_str(), branch.as_str(), enabled),
-        ("github.com", "develop", false)
-    );
-    // 已安装的技能不回填：NULL 就按 github.com 读
-    let repo_host: Option<String> = conn
-        .query_row("SELECT repo_host FROM skills", [], |row| row.get(0))
-        .expect("migrated skill");
-    assert_eq!(repo_host, None);
-}
-
-#[test]
 fn schema_migration_sets_user_version_when_missing() {
     let conn = Connection::open_in_memory().expect("open memory db");
 
@@ -758,7 +677,6 @@ fn json_migration_accepts_minimal_config() {
         apps,
         mcp: Default::default(),
         prompts: Default::default(),
-        skills: Default::default(),
         common_config_snippets: Default::default(),
         claude_common_config_snippet: None,
     };
@@ -808,7 +726,6 @@ fn json_migration_imports_provider_data() {
         apps,
         mcp: Default::default(),
         prompts: Default::default(),
-        skills: Default::default(),
         common_config_snippets: Default::default(),
         claude_common_config_snippet: None,
     };

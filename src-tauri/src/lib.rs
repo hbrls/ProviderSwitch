@@ -1,6 +1,4 @@
 mod agy_config;
-#[cfg(all(test, unix))]
-mod agy_smoke_tests;
 mod app_config;
 mod app_store;
 mod app_update;
@@ -69,7 +67,7 @@ mod window_fit;
 mod workbuddy_config;
 
 use crate::sync_utils::MutexExt;
-pub use app_config::{AppType, InstalledSkill, McpApps, McpServer, MultiAppConfig, SkillApps};
+pub use app_config::{AppType, McpApps, McpServer, MultiAppConfig};
 pub use codex_config::{
     extract_codex_experimental_bearer_token, get_codex_auth_path, get_codex_config_path,
     read_codex_live_settings, write_codex_live_atomic,
@@ -90,7 +88,6 @@ pub use services::{
     provider::{
         reapply_current_codex_official_live, reapply_current_codex_third_party_live, EditorSave,
     },
-    skill::{migrate_skills_to_ssot, ImportSkillSelection},
     ConfigService, McpService, PromptService, ProviderService, SkillService,
 };
 pub use settings::{update_settings, AppSettings};
@@ -801,56 +798,6 @@ pub fn run() {
             // 按表独立判断的导入逻辑（各类数据独立检查，互不影响）
             // ============================================================
 
-            // 1. 初始化默认 Skills 仓库（已有内置检查：表非空则跳过）
-            match app_state.db.init_default_skill_repos() {
-                Ok(count) if count > 0 => {
-                    log::info!("✓ Initialized {count} default skill repositories");
-                }
-                Ok(_) => {} // 表非空，静默跳过
-                Err(e) => log::warn!("✗ Failed to initialize default skill repos: {e}"),
-            }
-
-            // 1.1. Skills 统一管理迁移：当数据库迁移到 v3 结构后，自动从各应用目录导入到 SSOT
-            // 触发条件由 schema 迁移设置 settings.skills_ssot_migration_pending = true 控制。
-            match app_state.db.get_setting("skills_ssot_migration_pending") {
-                Ok(Some(flag)) if flag == "true" || flag == "1" => {
-                    // 安全保护：如果用户已经有 v3 结构的 Skills 数据，就不要自动清空重建。
-                    let has_existing = app_state
-                        .db
-                        .get_all_installed_skills()
-                        .map(|skills| !skills.is_empty())
-                        .unwrap_or(false);
-
-                    if has_existing {
-                        log::info!(
-                            "Detected skills_ssot_migration_pending but skills table not empty; skipping auto import."
-                        );
-                        let _ = app_state
-                            .db
-                            .set_setting("skills_ssot_migration_pending", "false");
-                    } else {
-                        match crate::services::skill::migrate_skills_to_ssot(&app_state.db) {
-                            Ok(count) => {
-                                log::info!("✓ Auto imported {count} skill(s) into SSOT");
-                                if count > 0 {
-                                    crate::init_status::set_skills_migration_result(count);
-                                }
-                                let _ = app_state
-                                    .db
-                                    .set_setting("skills_ssot_migration_pending", "false");
-                            }
-                            Err(e) => {
-                                log::warn!("✗ Failed to auto import legacy skills to SSOT: {e}");
-                                crate::init_status::set_skills_migration_error(e.to_string());
-                                // 保留 pending 标志，方便下次启动重试
-                            }
-                        }
-                    }
-                }
-                Ok(_) => {} // 未开启迁移标志，静默跳过
-                Err(e) => log::warn!("✗ Failed to read skills migration flag: {e}"),
-            }
-
             // 1.5. 自动导入 live 配置 + seed 官方预设供应商（Claude / Codex / Gemini）
             //
             // 先 import 后 seed 是有意为之：先把用户手动配置的 settings.json / auth.json / .env
@@ -1285,10 +1232,6 @@ pub fn run() {
             app.manage(app_state);
             app.manage(services::kimi_oauth::KimiOAuthManager::default());
 
-            // 初始化 SkillService
-            let skill_service = SkillService::new();
-            app.manage(commands::skill::SkillServiceState(Arc::new(skill_service)));
-
             // 初始化 CopilotAuthManager
             {
                 use crate::proxy::providers::copilot_auth::CopilotAuthManager;
@@ -1574,7 +1517,6 @@ pub fn run() {
             commands::open_external,
             commands::get_init_error,
             commands::get_migration_result,
-            commands::get_skills_migration_result,
             commands::open_app_config_folder,
             commands::reveal_app_log_file,
             commands::read_live_provider_settings,
@@ -1698,7 +1640,6 @@ pub fn run() {
             commands::s3_sync_fetch_remote_info,
             commands::save_file_dialog,
             commands::open_file_dialog,
-            commands::open_zip_file_dialog,
             commands::create_db_backup,
             commands::list_db_backups,
             commands::list_backup_locations,
@@ -1718,35 +1659,6 @@ pub fn run() {
             // Environment variable management
             commands::check_env_conflicts,
             commands::delete_env_vars,
-            // Skill management (v3.10.0+ unified)
-            commands::get_installed_skills,
-            commands::refresh_local_skill_metadata,
-            commands::get_skill_backups,
-            commands::delete_skill_backup,
-            commands::install_skill_unified,
-            commands::uninstall_skill_unified,
-            commands::restore_skill_backup,
-            commands::toggle_skill_app,
-            commands::scan_unmanaged_skills,
-            commands::import_skills_from_apps,
-            commands::discover_available_skills,
-            commands::discover_repo_skills,
-            commands::check_skill_updates,
-            commands::resync_skills_to_apps,
-            commands::update_skill,
-            commands::migrate_skill_storage,
-            commands::get_cc_switch_skills_dir,
-            commands::open_cc_switch_skills_dir,
-            commands::open_skill_dir,
-            commands::search_skills_sh,
-            // Skill management (legacy API compatibility)
-            commands::get_skill_repos,
-            commands::add_skill_repo,
-            commands::remove_skill_repo,
-            commands::get_skill_repo_tokens,
-            commands::set_skill_repo_token,
-            commands::delete_skill_repo_token,
-            commands::install_skills_from_zip,
             // Auto launch
             commands::set_auto_launch,
             // Proxy server management
