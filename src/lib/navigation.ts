@@ -18,8 +18,6 @@ export type GlobalPage =
   | "usage"
   | "auth"
   | "mcp"
-  | "skills"
-  | "skillsDiscovery"
   | "plugins"
   | "prompts"
   | "sessions"
@@ -55,8 +53,6 @@ const GLOBAL_PAGES: GlobalPage[] = [
   "usage",
   "auth",
   "mcp",
-  "skills",
-  "skillsDiscovery",
   "plugins",
   "prompts",
   "sessions",

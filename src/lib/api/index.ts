@@ -5,7 +5,6 @@ export { settingsApi } from "./settings";
 export { backupsApi } from "./settings";
 export { profilesApi } from "./profiles";
 export { promptsApi } from "./prompts";
-export { skillsApi } from "./skills";
 export { usageApi } from "./usage";
 export { vscodeApi } from "./vscode";
 export { openclawApi } from "./openclaw";

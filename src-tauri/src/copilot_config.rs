@@ -115,10 +115,6 @@ pub fn mcp_config_path() -> PathBuf {
     copilot_dir().join("mcp-config.json")
 }
 
-pub fn skills_dir() -> PathBuf {
-    copilot_dir().join("skills")
-}
-
 pub fn session_state_dir() -> PathBuf {
     copilot_dir().join("session-state")
 }
