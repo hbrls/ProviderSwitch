@@ -82,6 +82,7 @@ pub struct ProxyTakeoverStatus {
     pub grokbuild: bool,
     #[serde(rename = "claude-desktop", default)]
     pub claude_desktop: bool,
+    pub kilo: bool,
 }
 
 /// Provider健康状态
@@ -128,7 +129,7 @@ pub struct GlobalProxyConfig {
 pub struct AppProxyConfig {
     /// 应用类型 (claude/codex/gemini)
     pub app_type: String,
-    /// 该 app 代理启用开关
+    /// live-state.json 中代理模式的只读投影；修改模式须调用控制器。
     pub enabled: bool,
     /// 该 app 自动故障转移开关
     pub auto_failover_enabled: bool,

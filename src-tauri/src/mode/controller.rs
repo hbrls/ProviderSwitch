@@ -104,14 +104,9 @@ enum LiveNow {
 impl LiveNow {
     fn of(state: &AppState, app: &AppType, mode: &ModeState) -> Result<Self, String> {
         if mode.attached {
-            // 旧版接管留下的状态没有路由记录，那时路由就是直连指针。
-            let route = match route_provider(state, app, mode)? {
-                Some(route) => Some(route),
-                None => direct_provider(state, app)?,
-            };
             Ok(Self::Proxy {
                 contract: mode.contract.clone(),
-                route,
+                route: route_provider(state, app, mode)?,
             })
         } else {
             Ok(Self::Direct(direct_provider(state, app)?))
@@ -514,6 +509,11 @@ async fn write_proxy(
             .map_err(err)?;
             unchanged
         }
+        AppType::Kilo => {
+            commit_state(state, app, &PendingTarget::mode(target))?;
+            // Kilo 只提交路由状态，不重写客户端配置。
+            true
+        }
         _ => return Err(format!("{} 不支持本地路由", app.as_str())),
     };
     Ok(!unchanged)
@@ -640,6 +640,7 @@ fn write_direct(
             });
             claude_desktop_config::run(&state.db, op_name, write, pending_target).map_err(err)?;
         }
+        AppType::Kilo => commit_state(state, app, &pending_target)?,
         _ => return Err(format!("{} 不支持本地路由", app.as_str())),
     }
     Ok(())
@@ -801,7 +802,7 @@ async fn enter_locked(
     stack_mode: Option<bool>,
     explicit_route: Option<Provider>,
 ) -> Result<(), String> {
-    if !state.proxy_service.is_running().await {
+    if !matches!(app, AppType::Kilo) && !state.proxy_service.is_running().await {
         state.proxy_service.start().await?;
     }
     let mode = current::mode_state(app);
@@ -819,6 +820,12 @@ async fn enter_locked(
             )
         })?,
     };
+    if matches!(app, AppType::Kilo) {
+        crate::proxy::kilo::parse_provider(&route).map_err(err)?;
+        if !state.proxy_service.is_running().await {
+            state.proxy_service.start().await?;
+        }
+    }
     let next_stack = match stack_mode {
         Some(on) => {
             let current = settled_stack(app)?;
@@ -920,6 +927,7 @@ pub async fn exit(state: &AppState, app: &AppType) -> Result<(), String> {
     {
         let _guard = lock_settled(state, app).await.map_err(|e| e.to_string())?;
         exit_locked(state, app, false)?;
+        state.proxy_service.clear_active_target(app).await;
     }
     if let Err(error) = state.proxy_service.clear_provider_health_for_app(app).await {
         log::warn!("清除 {} 健康状态失败: {error}", app.as_str());
@@ -1041,6 +1049,8 @@ pub async fn exit_all(state: &AppState) -> Result<(), String> {
         };
         if let Err(error) = result {
             errors.push(format!("{}: {error}", app.as_str()));
+        } else {
+            state.proxy_service.clear_active_target(&app).await;
         }
     }
     if state.proxy_service.is_running().await {
@@ -1072,6 +1082,8 @@ pub async fn detach_all(state: &AppState) {
         };
         if let Err(error) = result {
             log::error!("退出时把 {} 指回直连失败: {error}", app.as_str());
+        } else {
+            state.proxy_service.clear_active_target(&app).await;
         }
     }
     if state.proxy_service.is_running().await {
@@ -1107,6 +1119,9 @@ pub async fn switch_route_locked(
     let mode = current::mode_state(app);
     if !mode.is_proxy() {
         return Err(format!("{} 不在代理模式", app.as_str()));
+    }
+    if matches!(app, AppType::Kilo) {
+        crate::proxy::kilo::parse_provider(target).map_err(err)?;
     }
     let new_state = ModeState {
         proxy_route: Some(target.id.clone()),
@@ -1752,18 +1767,7 @@ pub async fn record_failover_route(
     Ok(true)
 }
 
-/// 启动时：先按旧版遗留的接管状态定下每个应用的模式（首次运行新版、降级后再升级），
-/// 再把代理模式的应用接上。要在补完上次未完成的写入之后、自动提取通用配置片段之后。
-///
-/// | `proxy_config.enabled` | 备份行或占位符 | 处理 |
-/// |---|---|---|
-/// | 1 | 无 | 代理模式，接上 |
-/// | 1 | 有 | 不回放备份，直接写代理契约；备份行转存到本机文件后删除 |
-/// | 0 | 有 | 写回直连投影 |
-/// | 0 | 无 | 直连 |
-///
-/// 有遗留物时以 `enabled` 为准（旧版是最后一个写入者）；没有时以 `live-state.json`
-/// 为准，它还没有值就按 `enabled` 定。
+/// 启动时按设备本地 JSON 模式接上代理，在恢复未完成写入和提取通用配置之后执行。
 pub async fn startup(state: &AppState) {
     for app in route_mode_apps() {
         let result = match lock_settled(state, &app).await {
@@ -1781,6 +1785,12 @@ pub async fn startup(state: &AppState) {
 }
 
 async fn startup_app(state: &AppState, app: &AppType) -> Result<(), String> {
+    if matches!(app, AppType::Kilo) {
+        if current::is_proxy(app) {
+            return enter_locked(state, app, op::ATTACH, None, None).await;
+        }
+        return Ok(());
+    }
     let had_backup = drain_legacy_backup(state, app).await;
     let mut mode = current::mode_state(app);
     // 新版自己接上时写的占位符不算遗留物（比如重启更新时没来得及分离）。
@@ -1840,12 +1850,6 @@ async fn startup_app(state: &AppState, app: &AppType) -> Result<(), String> {
     }
 
     if mode.attached || mode.mode != Some(Mode::Direct) {
-        if placeholder {
-            log::warn!(
-                "{} 的客户端配置里有旧版接管留下的代理占位符，已写回直连配置",
-                app.as_str()
-            );
-        }
         let live_now = if mode.attached {
             LiveNow::Proxy {
                 contract: mode.contract.clone(),
