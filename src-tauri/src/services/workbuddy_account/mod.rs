@@ -1037,29 +1037,6 @@ fn identity(doc: &Value) -> Option<Identity> {
     })
 }
 
-/// WorkBuddy 当前账号的数据目录（WorkBuddy `WorkbuddyPathService.userDir`）：登录后是
-/// `<数据目录>/user-<uid>-<enterpriseId，没有就是 personal>`，没登录或认不出账号时就是数据目录
-/// 本身（WorkBuddy `resolveUserDataDir` 的回落）。用户级说明 `MEMORY.md` 放在这里，换号即换文件。
-pub fn user_data_dir() -> PathBuf {
-    user_data_dir_in(
-        &WorkBuddyPaths::system(),
-        &crate::workbuddy_config::data_dir(),
-    )
-}
-
-fn user_data_dir_in(paths: &WorkBuddyPaths, root: &Path) -> PathBuf {
-    let Some(account) = live_account(paths) else {
-        return root.to_path_buf();
-    };
-    let Some(uid) = plain(account.get("uid")).filter(|uid| is_path_segment(uid)) else {
-        return root.to_path_buf();
-    };
-    let scope = plain(account.get("enterpriseId"))
-        .filter(|scope| is_path_segment(scope))
-        .unwrap_or_else(|| "personal".to_string());
-    root.join(format!("user-{uid}-{scope}"))
-}
-
 /// `.info` 里明文的 `account`（uid、版型、`enterpriseId` 等，不含 token）；没登录或读不出时为 `None`。
 fn live_account(paths: &WorkBuddyPaths) -> Option<Value> {
     if paths.logout_marker().exists() {
@@ -1069,11 +1046,6 @@ fn live_account(paths: &WorkBuddyPaths) -> Option<Value> {
         .ok()
         .and_then(|bytes| serde_json::from_slice::<Value>(&bytes).ok())
         .and_then(|mut doc| doc.get_mut("account").map(Value::take))
-}
-
-/// 拼进目录名的明文字段：不能带路径分隔符或 `..`（`.info` 是外部文件）。
-fn is_path_segment(value: &str) -> bool {
-    !value.contains(['/', '\\']) && !value.contains("..")
 }
 
 fn is_observation_name(name: &str) -> bool {

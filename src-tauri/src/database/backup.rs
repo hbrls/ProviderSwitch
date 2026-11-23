@@ -18,8 +18,8 @@ use tempfile::{Builder, NamedTempFile};
 
 const CC_SWITCH_SQL_EXPORT_HEADER: &str = "-- CC Switch SQLite 导出";
 
-/// SQL 导入允许的最大体积（与云同步产物上限保持一致，防止超大文件触发 OOM）。
-const MAX_SQL_IMPORT_BYTES: u64 = crate::services::sync_protocol::MAX_SYNC_ARTIFACT_BYTES;
+/// SQL 导入允许的最大体积（512 MB，防止超大文件触发 OOM）。
+const MAX_SQL_IMPORT_BYTES: u64 = 512 * 1024 * 1024;
 
 /// 外部 SQL 批量执行的超时上限，防止恶意 `WITH RECURSIVE` 等语句永久挂死并占住锁。
 const SQL_IMPORT_EXECUTION_TIMEOUT: Duration = Duration::from_secs(30);
@@ -152,17 +152,6 @@ const SYNC_SKIP_TABLES: &[&str] = &[
     "session_usage_dedup",
 ];
 
-/// Tables whose local data is preserved from the live database during WebDAV import.
-/// Excludes ephemeral tables like provider_health that can safely rebuild at runtime.
-const SYNC_PRESERVE_TABLES: &[&str] = &[
-    "proxy_request_logs",
-    "stream_check_logs",
-    "proxy_live_backup",
-    "usage_daily_rollups",
-    "session_log_sync",
-    "session_usage_dedup",
-];
-
 /// A database backup entry for the UI
 #[derive(Debug, serde::Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -237,12 +226,6 @@ impl Database {
     /// 从 SQL 字符串导入，返回生成的备份 ID（若无备份则为空字符串）
     pub fn import_sql_string(&self, sql_raw: &str) -> Result<String, AppError> {
         self.import_sql_string_inner(sql_raw, &[])
-    }
-
-    /// Import SQL generated for sync, then restore local-only tables from the
-    /// current live database before replacing it.
-    pub(crate) fn import_sql_string_for_sync(&self, sql_raw: &str) -> Result<String, AppError> {
-        self.import_sql_string_inner(sql_raw, SYNC_PRESERVE_TABLES)
     }
 
     fn import_sql_string_inner(

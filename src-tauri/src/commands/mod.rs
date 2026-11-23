@@ -35,9 +35,7 @@ mod sync_support;
 mod terminal_launch;
 mod xai_oauth;
 
-mod s3_sync;
 mod usage;
-mod webdav_sync;
 mod workbuddy_account;
 mod workspace;
 
@@ -82,9 +80,7 @@ pub use subscription::*;
 pub use terminal_launch::*;
 pub use xai_oauth::*;
 
-pub use s3_sync::*;
 pub use usage::*;
-pub use webdav_sync::*;
 pub use workbuddy_account::*;
 pub use workspace::*;
 

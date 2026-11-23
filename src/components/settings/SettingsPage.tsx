@@ -34,7 +34,6 @@ import { AppPageHeader } from "@/components/shell/AppPageHeader";
 import { DirectoryInput } from "@/components/settings/DirectorySettings";
 import { ImportExportSection } from "@/components/settings/ImportExportSection";
 import { BackupListSection } from "@/components/settings/BackupListSection";
-import { WebdavSyncSection } from "@/components/settings/WebdavSyncSection";
 import { AboutSection } from "@/components/settings/AboutSection";
 import { RoutingSection } from "@/components/settings/sections/RoutingSection";
 import { PrivacyFilterConfigPanel } from "@/components/settings/PrivacyFilterConfigPanel";
@@ -485,22 +484,6 @@ export function SettingsPage({
                   backupRetainCount={settings.backupRetainCount}
                   backupMaxTotalMb={settings.backupMaxTotalMb}
                   onSettingsChange={(updates) => handleAutoSave(updates)}
-                />
-              </div>
-            </SettingsBlock>
-            <SettingsBlock
-              title={t("settings.advanced.cloudSync.title")}
-              help={{
-                title: t("settings.advanced.cloudSync.title"),
-                body: t("settings.advanced.cloudSync.description"),
-              }}
-            >
-              <div className="rounded-panel border border-border bg-surface p-5">
-                <WebdavSyncSection
-                  config={settings.webdavSync}
-                  s3Config={settings.s3Sync}
-                  settings={settings}
-                  onAutoSave={handleAutoSave}
                 />
               </div>
             </SettingsBlock>

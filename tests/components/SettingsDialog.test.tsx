@@ -134,9 +134,6 @@ vi.mock("@/components/ui/dialog", () => ({
 vi.mock("@/components/settings/AboutSection", () => ({
   AboutSection: ({ isPortable }: any) => <div>about:{String(isPortable)}</div>,
 }));
-vi.mock("@/components/settings/WebdavSyncSection", () => ({
-  WebdavSyncSection: () => <div>webdav-sync-section</div>,
-}));
 vi.mock("@/components/settings/BackupListSection", () => ({
   BackupListSection: () => <div>backup-list-section</div>,
 }));
@@ -285,7 +282,6 @@ describe("SettingsPage", () => {
     fireEvent.click(screen.getByRole("button", { name: "common.clear" }));
     expect(importExportMock.clearSelection).toHaveBeenCalled();
 
-    expect(screen.getByText("webdav-sync-section")).toBeInTheDocument();
     expect(screen.getByText("backup-list-section")).toBeInTheDocument();
     expect(screen.getByText("log-config-panel")).toBeInTheDocument();
   });

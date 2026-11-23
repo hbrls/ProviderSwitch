@@ -43,7 +43,7 @@ pub use dao::UnreadableEntry;
 
 use crate::config::get_app_config_dir;
 use crate::error::AppError;
-use rusqlite::{hooks::Action, Connection};
+use rusqlite::Connection;
 use serde::Serialize;
 use std::sync::{Arc, Mutex, MutexGuard};
 
@@ -163,13 +163,11 @@ fn register_db_change_hook(conn: &Connection, cache: Arc<read_cache::ProxyReadCa
     let rollback_cache = cache.clone();
     conn.rollback_hook(Some(move || rollback_cache.invalidate_all()));
     conn.update_hook(Some(
-        move |action: Action, _database: &str, table: &str, _row_id: i64| match action {
-            Action::SQLITE_INSERT | Action::SQLITE_UPDATE | Action::SQLITE_DELETE => {
-                cache.invalidate_table(table);
-                use crate::services::{auto_sync, s3_auto_sync, webdav_auto_sync};
-                auto_sync::notify_db_changed::<webdav_auto_sync::WebDavAutoSync>(table);
-                auto_sync::notify_db_changed::<s3_auto_sync::S3AutoSync>(table);
-            }
+        move |action: rusqlite::hooks::Action, _database: &str, table: &str, _row_id: i64| match action
+        {
+            rusqlite::hooks::Action::SQLITE_INSERT
+            | rusqlite::hooks::Action::SQLITE_UPDATE
+            | rusqlite::hooks::Action::SQLITE_DELETE => cache.invalidate_table(table),
             _ => {}
         },
     ));
@@ -240,7 +238,7 @@ impl Database {
             conn.execute("PRAGMA auto_vacuum = INCREMENTAL;", [])
                 .map_err(|e| AppError::Database(e.to_string()))?;
         }
-        Self::configure_connection(&conn)?;
+
         let read_cache = Arc::new(read_cache::ProxyReadCache::default());
         register_db_change_hook(&conn, read_cache.clone());
 
