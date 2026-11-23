@@ -27,6 +27,7 @@ mod plugin_manager;
 mod profile;
 mod provider;
 mod proxy;
+mod provider_quality_check;
 mod session_manager;
 mod settings;
 mod stream_check;
