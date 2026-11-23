@@ -4,7 +4,6 @@ import { useQuery } from "@tanstack/react-query";
 import { getVersion } from "@tauri-apps/api/app";
 import {
   ArrowLeft,
-  BookOpen,
   ChartColumn,
   ChevronsLeft,
   ChevronsRight,
@@ -275,7 +274,6 @@ function MainDirectory({
   }[] = [
     { page: "mcp", label: "MCP", icon: Server },
     { page: "plugins", label: t("nav.plugins"), icon: Puzzle },
-    { page: "prompts", label: t("nav.prompts"), icon: BookOpen },
     { page: "sessions", label: t("nav.sessions"), icon: History },
     {
       page: "auth",
