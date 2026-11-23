@@ -676,7 +676,6 @@ fn json_migration_accepts_minimal_config() {
         version: 2,
         apps,
         mcp: Default::default(),
-        prompts: Default::default(),
         common_config_snippets: Default::default(),
         claude_common_config_snippet: None,
     };
@@ -725,7 +724,6 @@ fn json_migration_imports_provider_data() {
         version: 2,
         apps,
         mcp: Default::default(),
-        prompts: Default::default(),
         common_config_snippets: Default::default(),
         claude_common_config_snippet: None,
     };

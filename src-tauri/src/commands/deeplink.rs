@@ -1,5 +1,5 @@
 use crate::deeplink::{
-    import_mcp_from_deeplink, import_prompt_from_deeplink, import_provider_from_deeplink,
+    import_mcp_from_deeplink, import_provider_from_deeplink,
     DeepLinkImportRequest, PendingDeepLinkEntry,
 };
 use crate::error::AppError;
@@ -49,13 +49,6 @@ pub async fn import_from_deeplink_unified(
             Ok(serde_json::json!({
                 "type": "provider",
                 "id": provider_id
-            }))
-        }
-        "prompt" => {
-            let prompt_id = import_prompt_from_deeplink(&state, request)?;
-            Ok(serde_json::json!({
-                "type": "prompt",
-                "id": prompt_id
             }))
         }
         "mcp" => {
